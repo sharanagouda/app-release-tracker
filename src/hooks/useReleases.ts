@@ -1,7 +1,47 @@
 import { useState, useEffect } from 'react';
 import { Release, ReleaseStats, FilterOptions } from '../types/release';
 import { mockReleases } from '../data/mockData';
-import { downloadJSON, downloadMockData, downloadCSV, importFromJSON } from '../utils/fileStorage';
+import { downloadJSON, downloadCSV } from '../utils/fileStorage';
+
+// Function to update mockData.ts file
+const updateMockDataFile = async (releases: Release[]) => {
+  const mockDataContent = `import { Release } from '../types/release';
+
+export const CONCEPTS = [
+  'lifestyle',
+  'babyshop',
+  'splash',
+  'shoemart',
+  'centrepoint',
+  'shoexpress',
+  'mothercare',
+  'homecentre',
+  'homebox',
+  'max'
+];
+
+export const PLATFORMS = ['iOS', 'Android GMS', 'Android HMS'] as const;
+
+export const mockReleases: Release[] = ${JSON.stringify(releases, null, 2)};
+`;
+
+  try {
+    // Note: This will update the file in the project
+    const response = await fetch('/api/update-mockdata', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content: mockDataContent }),
+    });
+    
+    if (!response.ok) {
+      console.warn('Could not update mockData.ts file automatically');
+    }
+  } catch (error) {
+    console.warn('Could not update mockData.ts file automatically:', error);
+  }
+};
 
 export const useReleases = () => {
   const [releases, setReleases] = useState<Release[]>([]);
@@ -47,6 +87,7 @@ export const useReleases = () => {
     const updatedReleases = [...releases, newRelease];
     setReleases(updatedReleases);
     localStorage.setItem('releases', JSON.stringify(updatedReleases));
+    updateMockDataFile(updatedReleases);
   };
 
   const updateRelease = (id: string, updates: Partial<Release>) => {
@@ -57,12 +98,14 @@ export const useReleases = () => {
     );
     setReleases(updatedReleases);
     localStorage.setItem('releases', JSON.stringify(updatedReleases));
+    updateMockDataFile(updatedReleases);
   };
 
   const deleteRelease = (id: string) => {
     const updatedReleases = releases.filter(release => release.id !== id);
     setReleases(updatedReleases);
     localStorage.setItem('releases', JSON.stringify(updatedReleases));
+    updateMockDataFile(updatedReleases);
   };
 
   const importReleases = async (file: File) => {
