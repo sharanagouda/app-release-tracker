@@ -155,7 +155,6 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               Import
             </button>
           </div>
-          </button>
         </div>
       </div>
     </div>
