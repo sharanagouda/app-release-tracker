@@ -198,8 +198,6 @@ function App() {
           onSearchChange={setSearchTerm}
           onExportCSV={exportToCSV}
           onExportJSON={exportToJSON}
-          onExportMockData={exportToMockData}
-          onImport={importReleases}
         />
 
         {/* Current Release Status */}
