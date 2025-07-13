@@ -8,7 +8,10 @@ interface FilterBarProps {
   onFiltersChange: (filters: Partial<FilterOptions>) => void;
   searchTerm: string;
   onSearchChange: (term: string) => void;
-  onExport: () => void;
+  onExportCSV: () => void;
+  onExportJSON: () => void;
+  onExportMockData: () => void;
+  onImport: (file: File) => Promise<{ success: boolean; message: string }>;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -16,10 +19,45 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onFiltersChange,
   searchTerm,
   onSearchChange,
-  onExport,
+  onExportCSV,
+  onExportJSON,
+  onExportMockData,
+  onImport,
 }) => {
+  const [importMessage, setImportMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const result = await onImport(file);
+      setImportMessage({
+        type: result.success ? 'success' : 'error',
+        text: result.message
+      });
+      
+      // Clear message after 3 seconds
+      setTimeout(() => setImportMessage(null), 3000);
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 space-y-4">
+      {importMessage && (
+        <div className={`p-3 rounded-lg text-sm ${
+          importMessage.type === 'success' 
+            ? 'bg-green-50 text-green-700 border border-green-200' 
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {importMessage.text}
+        </div>
+      )}
+      
       <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-4 flex-1">
           <div className="relative flex-1">
@@ -81,11 +119,42 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           </div>
           
           <button
-            onClick={onExport}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-150"
+            onClick={onExportCSV}
+            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-150 text-sm"
           >
             <Download className="h-4 w-4" />
-            Export
+            CSV
+          </button>
+          
+          <button
+            onClick={onExportJSON}
+            className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-150 text-sm"
+          >
+            <Download className="h-4 w-4" />
+            JSON
+          </button>
+          
+          <button
+            onClick={onExportMockData}
+            className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-150 text-sm"
+          >
+            <Download className="h-4 w-4" />
+            Mock
+          </button>
+          
+          <div className="relative">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImport}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <button className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-150 text-sm">
+              <Search className="h-4 w-4" />
+              Import
+            </button>
+          </div>
           </button>
         </div>
       </div>

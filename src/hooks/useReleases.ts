@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Release, ReleaseStats, FilterOptions } from '../types/release';
 import { mockReleases } from '../data/mockData';
+import { downloadJSON, downloadMockData, downloadCSV, importFromJSON } from '../utils/fileStorage';
 
 export const useReleases = () => {
   const [releases, setReleases] = useState<Release[]>([]);
@@ -64,6 +65,29 @@ export const useReleases = () => {
     localStorage.setItem('releases', JSON.stringify(updatedReleases));
   };
 
+  const importReleases = async (file: File) => {
+    try {
+      const importedReleases = await importFromJSON(file);
+      setReleases(importedReleases);
+      localStorage.setItem('releases', JSON.stringify(importedReleases));
+      return { success: true, message: `Successfully imported ${importedReleases.length} releases` };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Import failed' };
+    }
+  };
+
+  const exportToJSON = () => {
+    downloadJSON(releases);
+  };
+
+  const exportToMockData = () => {
+    downloadMockData(releases);
+  };
+
+  const exportToCSV = () => {
+    downloadCSV(releases);
+  };
+
   const getStats = (): ReleaseStats => {
     const allPlatforms = releases.flatMap(r => Array.isArray(r.platforms) ? r.platforms : []);
     return {
@@ -103,5 +127,9 @@ export const useReleases = () => {
     deleteRelease,
     getStats,
     filterReleases,
+    importReleases,
+    exportToJSON,
+    exportToMockData,
+    exportToCSV,
   };
 };

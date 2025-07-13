@@ -10,7 +10,19 @@ import { AuthModal } from './components/AuthModal';
 import { Release, FilterOptions } from './types/release';
 
 function App() {
-  const { releases, loading, addRelease, updateRelease, deleteRelease, getStats, filterReleases } = useReleases();
+  const { 
+    releases, 
+    loading, 
+    addRelease, 
+    updateRelease, 
+    deleteRelease, 
+    getStats, 
+    filterReleases,
+    importReleases,
+    exportToJSON,
+    exportToMockData,
+    exportToCSV
+  } = useReleases();
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -107,35 +119,6 @@ function App() {
     }
   };
 
-  const handleExport = () => {
-    const csvContent = [
-      ['Release Date', 'Release Name', 'Concept', 'Platform', 'Version', 'Build ID', 'Rollout %', 'Status', 'Platform Notes', 'Changes', 'General Notes'],
-      ...filteredReleases.flatMap(release =>
-        release.platforms.map(platform => [
-          release.releaseDate,
-          release.releaseName,
-          release.concept,
-          platform.platform,
-          platform.version,
-          platform.buildId,
-          platform.rolloutPercentage.toString(),
-          platform.status,
-          platform.notes || '',
-          release.changes.join('; '),
-          release.notes || ''
-        ])
-      )
-    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `release-history-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   // Get current active releases for the status cards
   const getCurrentActiveReleases = () => {
     return filteredReleases
@@ -213,7 +196,10 @@ function App() {
           onFiltersChange={setFilters}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
-          onExport={handleExport}
+          onExportCSV={exportToCSV}
+          onExportJSON={exportToJSON}
+          onExportMockData={exportToMockData}
+          onImport={importReleases}
         />
 
         {/* Current Release Status */}
