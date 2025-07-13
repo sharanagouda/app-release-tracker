@@ -61,9 +61,13 @@ export const useReleases = () => {
             platforms: Array.isArray(release.platforms) ? release.platforms : []
           }));
           setReleases(validatedReleases);
+          // Update mockData.ts to match localStorage
+          updateMockDataFile(validatedReleases);
         } else {
           setReleases(mockReleases);
           localStorage.setItem('releases', JSON.stringify(mockReleases));
+          // Update mockData.ts with initial data
+          updateMockDataFile(mockReleases);
         }
       } catch (error) {
         console.error('Error loading releases:', error);
