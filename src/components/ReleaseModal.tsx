@@ -178,7 +178,6 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select Concept</option>
-                <option value="All Concepts">All Concepts</option>
                 {CONCEPTS.map(concept => (
                   <option key={concept} value={concept}>{concept}</option>
                 ))}
@@ -233,19 +232,31 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
                         min="0"
                         max="100"
                         value={platform.rolloutPercentage}
-                        onChange={(e) => updatePlatform(index, 'rolloutPercentage', Number(e.target.value))}
+                        onChange={(e) => {
+                          const percentage = Number(e.target.value);
+                          updatePlatform(index, 'rolloutPercentage', percentage);
+                          // Auto-update status based on percentage
+                          const newStatus = percentage === 100 ? 'Complete' : 
+                                          percentage === 0 ? 'Paused' : 'In Progress';
+                          updatePlatform(index, 'status', newStatus);
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status
+                        Status (Auto-updated)
                       </label>
+                      <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                        {platform.rolloutPercentage === 100 ? 'Complete' : 
+                         platform.rolloutPercentage === 0 ? 'Paused' : 'In Progress'}
+                      </div>
+                      {/* Hidden select for form compatibility */}
                       <select
                         value={platform.status}
                         onChange={(e) => updatePlatform(index, 'status', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="hidden"
                       >
                         <option value="In Progress">In Progress</option>
                         <option value="Complete">Complete</option>
@@ -258,12 +269,13 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Platform Notes
                     </label>
-                    <input
+                    <textarea
+                      rows={2}
                       type="text"
                       value={platform.notes || ''}
                       onChange={(e) => updatePlatform(index, 'notes', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Platform-specific notes..."
+                      placeholder="Platform-specific notes, build links, environment details..."
                     />
                   </div>
                 </div>
