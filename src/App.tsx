@@ -242,7 +242,22 @@ function App() {
                       </div>
                     </div>
                   ))}
-                </div>
+               <div className="flex items-center space-x-2">
+                 <span className="text-xs text-gray-500">{release.concept}</span>
+                 {(() => {
+                   const platforms = Array.isArray(release.platforms) ? release.platforms : [];
+                   const allComplete = platforms.length > 0 && platforms.every(p => p && p.status === 'Complete');
+                   const allPaused = platforms.length > 0 && platforms.every(p => p && p.status === 'Paused');
+                   const overallStatus = allComplete ? 'Complete' : allPaused ? 'Paused' : 'In Progress';
+                   const statusColor = overallStatus === 'Complete' ? 'bg-green-100 text-green-800' :
+                                     overallStatus === 'Paused' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
+                   return (
+                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                       {overallStatus}
+                     </span>
+                   );
+                 })()}
+               </div>
               </div>
             ))}
           </div>

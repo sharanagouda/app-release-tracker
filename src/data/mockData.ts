@@ -41,7 +41,8 @@ export const mockReleases: Release[] = [
         buildId: '7065',
         rolloutPercentage: 100,
         status: 'Complete',
-        notes: 'BLC codepush completed - Build available at SharePoint'
+        notes: 'BLC codepush completed - Build available at SharePoint',
+        buildLink: 'https://landmarkgroup.sharepoint.com/:f:/r/sites/PlatformSquad/Shared%20Documents/General/BLC%20App%20builds/KW%20Launch/STAGE/8.91(1595)-7060?csf=1&web=1&e=RboBH7'
       }
     ],
     changes: [

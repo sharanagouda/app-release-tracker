@@ -278,6 +278,19 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
                       placeholder="Platform-specific notes, build links, environment details..."
                     />
                   </div>
+
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Build Link (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      value={platform.buildLink || ''}
+                      onChange={(e) => updatePlatform(index, 'buildLink', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="https://sharepoint.com/builds/..."
+                    />
+                  </div>
                 </div>
               ))}
             </div>

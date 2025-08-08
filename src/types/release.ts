@@ -5,6 +5,7 @@ export interface PlatformRelease {
   rolloutPercentage: number;
   status: 'Complete' | 'In Progress' | 'Paused';
   notes?: string;
+  buildLink?: string;
 }
 
 export interface Release {
