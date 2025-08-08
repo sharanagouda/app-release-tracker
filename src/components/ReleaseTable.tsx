@@ -107,7 +107,8 @@ export const ReleaseTable: React.FC<ReleaseTableProps> = ({
           {releases.map((release) => {
             const platforms = Array.isArray(release.platforms) ? release.platforms : [];
             const allComplete = platforms.length > 0 && platforms.every(p => p && p.status === 'Complete');
-            const overallStatus = allComplete ? 'Complete' : 'In Progress';
+            const allPaused = platforms.length > 0 && platforms.every(p => p && p.status === 'Paused');
+            const overallStatus = allComplete ? 'Complete' : allPaused ? 'Paused' : 'In Progress';
 
             return (
               <tr key={release.id} className="hover:bg-gray-50 transition-colors">
