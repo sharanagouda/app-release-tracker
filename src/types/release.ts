@@ -6,6 +6,13 @@ export interface PlatformRelease {
   status: 'Complete' | 'In Progress' | 'Paused';
   notes?: string;
   buildLink?: string;
+  rolloutHistory?: RolloutHistoryEntry[];
+}
+
+export interface RolloutHistoryEntry {
+  percentage: number;
+  date: string;
+  notes?: string;
 }
 
 export interface Release {

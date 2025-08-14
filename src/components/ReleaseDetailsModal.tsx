@@ -205,6 +205,31 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                         ></div>
                       </div>
                     </div>
+                    {platform.rolloutHistory && platform.rolloutHistory.length > 0 && (
+                      <div className="mt-3">
+                        <h5 className="text-xs font-medium text-gray-700 mb-2">Rollout History:</h5>
+                        <div className="space-y-1 max-h-24 overflow-y-auto">
+                          {platform.rolloutHistory.slice(-3).map((entry, historyIndex) => (
+                            <div key={historyIndex} className="text-xs text-gray-600 bg-gray-50 rounded px-2 py-1">
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">{entry.percentage}%</span>
+                                <span className="text-gray-500">
+                                  {new Date(entry.date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                              {entry.notes && (
+                                <div className="text-gray-500 mt-1">{entry.notes}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {platform.notes && (
                       <div className="mt-3 p-2 bg-gray-50 rounded text-xs lg:text-sm text-gray-600">
                         {platform.notes}

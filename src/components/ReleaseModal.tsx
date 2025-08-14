@@ -234,6 +234,20 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
                         value={platform.rolloutPercentage}
                         onChange={(e) => {
                           const percentage = Number(e.target.value);
+                          const currentPercentage = platform.rolloutPercentage;
+                          
+                          // Add to rollout history if percentage changed
+                          if (percentage !== currentPercentage) {
+                            const newHistoryEntry = {
+                              percentage: percentage,
+                              date: new Date().toISOString(),
+                              notes: `Updated from ${currentPercentage}% to ${percentage}%`
+                            };
+                            
+                            const updatedHistory = [...(platform.rolloutHistory || []), newHistoryEntry];
+                            updatePlatform(index, 'rolloutHistory', updatedHistory);
+                          }
+                          
                           updatePlatform(index, 'rolloutPercentage', percentage);
                           // Auto-update status based on percentage
                           const newStatus = percentage === 100 ? 'Complete' : 

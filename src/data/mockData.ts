@@ -33,7 +33,24 @@ export const mockReleases: Release[] = [
         buildId: '7065',
         rolloutPercentage: 100,
         status: 'Complete',
-        notes: 'BLC codepush completed for all concepts'
+        notes: 'BLC codepush completed for all concepts',
+        rolloutHistory: [
+          {
+            percentage: 0,
+            date: '2025-01-30T08:00:00Z',
+            notes: 'Initial deployment started'
+          },
+          {
+            percentage: 50,
+            date: '2025-01-30T10:00:00Z',
+            notes: 'Staged rollout to 50%'
+          },
+          {
+            percentage: 100,
+            date: '2025-01-30T12:00:00Z',
+            notes: 'Full rollout completed'
+          }
+        ]
       },
       {
         platform: 'Android GMS',
@@ -42,7 +59,24 @@ export const mockReleases: Release[] = [
         rolloutPercentage: 100,
         status: 'Complete',
         notes: 'BLC codepush completed - Build available at SharePoint',
-        buildLink: 'https://landmarkgroup.sharepoint.com/:f:/r/sites/PlatformSquad/Shared%20Documents/General/BLC%20App%20builds/KW%20Launch/STAGE/8.91(1595)-7060?csf=1&web=1&e=RboBH7'
+        buildLink: 'https://landmarkgroup.sharepoint.com/:f:/r/sites/PlatformSquad/Shared%20Documents/General/BLC%20App%20builds/KW%20Launch/STAGE/8.91(1595)-7060?csf=1&web=1&e=RboBH7',
+        rolloutHistory: [
+          {
+            percentage: 0,
+            date: '2025-01-30T08:00:00Z',
+            notes: 'Initial deployment started'
+          },
+          {
+            percentage: 25,
+            date: '2025-01-30T09:30:00Z',
+            notes: 'Gradual rollout to 25%'
+          },
+          {
+            percentage: 100,
+            date: '2025-01-30T12:00:00Z',
+            notes: 'Full rollout completed'
+          }
+        ]
       }
     ],
     changes: [
