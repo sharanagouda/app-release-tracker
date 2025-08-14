@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Filter, Search, Download, ExternalLink } from 'lucide-react';
-import { Release } from './types/release';
+import { Release, FilterOptions } from './types/release';
 import { useReleases } from './hooks/useReleases';
 import { ReleaseTable } from './components/ReleaseTable';
 import { ReleaseModal } from './components/ReleaseModal';
@@ -15,11 +15,10 @@ function App() {
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [conceptFilter, setConceptFilter] = useState('all');
+  const [filters, setFilters] = useState<Partial<FilterOptions>>({});
 
   const getOverallStatus = (release: Release) => {
-    const platforms = [release.ios, release.android, release.web].filter(Boolean);
+    const platforms = release.platforms || [];
     if (platforms.length === 0) return 'In Progress';
     
     const allComplete = platforms.every(p => p?.status === 'Complete');
@@ -33,8 +32,8 @@ function App() {
   const filteredReleases = releases.filter(release => {
     const matchesSearch = release.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          release.concept.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || getOverallStatus(release).toLowerCase() === statusFilter;
-    const matchesConcept = conceptFilter === 'all' || release.concept === conceptFilter;
+    const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
+    const matchesConcept = !filters.concept || filters.concept === 'All' || release.concept === filters.concept;
     
     return matchesSearch && matchesStatus && matchesConcept;
   });
@@ -64,6 +63,15 @@ function App() {
     setEditingRelease(null);
   };
 
+  const exportToCSV = () => {
+    // CSV export functionality
+    console.log('Exporting to CSV...');
+  };
+
+  const exportToJSON = () => {
+    // JSON export functionality
+    console.log('Exporting to JSON...');
+  };
   const stats = {
     total: releases.length,
     inProgress: releases.filter(r => getOverallStatus(r) === 'In Progress').length,
@@ -85,49 +93,40 @@ function App() {
           <StatCard
             title="Total Releases"
             value={stats.total}
-            icon={<ExternalLink className="w-6 h-6" />}
+            icon={ExternalLink}
             color="blue"
           />
           <StatCard
             title="In Progress"
             value={stats.inProgress}
-            icon={<Download className="w-6 h-6" />}
+            icon={Download}
             color="yellow"
           />
           <StatCard
             title="Completed"
             value={stats.completed}
-            icon={<Download className="w-6 h-6" />}
+            icon={Download}
             color="green"
           />
           <StatCard
             title="Paused"
             value={stats.paused}
-            icon={<Download className="w-6 h-6" />}
+            icon={Download}
             color="red"
           />
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search releases..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-          <FilterBar
-            statusFilter={statusFilter}
-            conceptFilter={conceptFilter}
-            onStatusFilterChange={setStatusFilter}
-            onConceptFilterChange={setConceptFilter}
-          />
+        <FilterBar
+          filters={filters}
+          onFiltersChange={setFilters}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onExportCSV={exportToCSV}
+          onExportJSON={exportToJSON}
+        />
+        
+        <div className="flex justify-end mb-6">
           <button
             onClick={handleAddRelease}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -170,33 +169,15 @@ function App() {
                 </div>
                 
                 <div className="space-y-2 mb-4">
-                  {release.ios && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">iOS</span>
+                  {release.platforms?.map((platform) => (
+                    <div key={platform.name} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">{platform.name}</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{release.ios.version}</span>
-                        <span className="text-xs text-gray-500">{release.ios.rolloutPercentage}%</span>
+                        <span className="text-sm font-medium">{platform.version}</span>
+                        <span className="text-xs text-gray-500">{platform.rolloutPercentage}%</span>
                       </div>
                     </div>
-                  )}
-                  {release.android && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Android</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{release.android.version}</span>
-                        <span className="text-xs text-gray-500">{release.android.rolloutPercentage}%</span>
-                      </div>
-                    </div>
-                  )}
-                  {release.web && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Web</span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">{release.web.version}</span>
-                        <span className="text-xs text-gray-500">{release.web.rolloutPercentage}%</span>
-                      </div>
-                    </div>
-                  )}
+                  ))}
                 </div>
 
                 <div className="flex space-x-2">
