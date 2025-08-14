@@ -5,7 +5,7 @@ import { useReleases } from './hooks/useReleases';
 import ReleaseTable from './components/ReleaseTable';
 import ReleaseModal from './components/ReleaseModal';
 import ReleaseDetailsModal from './components/ReleaseDetailsModal';
-import FilterBar from './components/FilterBar';
+import { FilterBar } from './components/FilterBar';
 import StatCard from './components/StatCard';
 
 function App() {
