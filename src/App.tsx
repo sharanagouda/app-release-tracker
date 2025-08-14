@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { Plus, Filter, Search, Download, ExternalLink } from 'lucide-react';
 import { Release } from './types/release';
 import { useReleases } from './hooks/useReleases';
-import ReleaseTable from './components/ReleaseTable';
-import ReleaseModal from './components/ReleaseModal';
-import ReleaseDetailsModal from './components/ReleaseDetailsModal';
+import { ReleaseTable } from './components/ReleaseTable';
+import { ReleaseModal } from './components/ReleaseModal';
+import { ReleaseDetailsModal } from './components/ReleaseDetailsModal';
 import { FilterBar } from './components/FilterBar';
-import StatCard from './components/StatCard';
+import { StatCard } from './components/StatCard';
 
 function App() {
   const { releases, addRelease, updateRelease, deleteRelease } = useReleases();
