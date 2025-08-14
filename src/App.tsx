@@ -30,7 +30,7 @@ function App() {
   };
 
   const filteredReleases = releases.filter(release => {
-    const matchesSearch = release.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = release.releaseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          release.concept.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
     const matchesConcept = !filters.concept || filters.concept === 'All' || release.concept === filters.concept;
@@ -160,7 +160,7 @@ function App() {
               <div key={release.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{release.name}</h3>
+                    <h3 className="font-semibold text-gray-900">{release.releaseName}</h3>
                     <p className="text-sm text-gray-600">{release.concept}</p>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[overallStatus as keyof typeof statusColors]}`}>
