@@ -5,6 +5,7 @@ import { useReleases } from './hooks/useReleases';
 import { ReleaseTable } from './components/ReleaseTable';
 import { ReleaseModal } from './components/ReleaseModal';
 import { ReleaseDetailsModal } from './components/ReleaseDetailsModal';
+import { AuthModal } from './components/AuthModal';
 import { FilterBar } from './components/FilterBar';
 import { StatCard } from './components/StatCard';
 
@@ -12,6 +13,9 @@ function App() {
   const { releases, addRelease, updateRelease, deleteRelease } = useReleases();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authAction, setAuthAction] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,13 +43,32 @@ function App() {
   });
 
   const handleAddRelease = () => {
-    setEditingRelease(null);
-    setIsModalOpen(true);
+    if (isAdmin) {
+      setEditingRelease(null);
+      setIsModalOpen(true);
+    } else {
+      setAuthAction('add a new release');
+      setIsAuthModalOpen(true);
+    }
   };
 
   const handleEditRelease = (release: Release) => {
-    setEditingRelease(release);
-    setIsModalOpen(true);
+    if (isAdmin) {
+      setEditingRelease(release);
+      setIsModalOpen(true);
+    } else {
+      setAuthAction('edit this release');
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleDeleteRelease = (id: string) => {
+    if (isAdmin) {
+      deleteRelease(id);
+    } else {
+      setAuthAction('delete this release');
+      setIsAuthModalOpen(true);
+    }
   };
 
   const handleViewDetails = (release: Release) => {
@@ -61,6 +84,16 @@ function App() {
     }
     setIsModalOpen(false);
     setEditingRelease(null);
+  };
+
+  const handleAuthRequired = () => {
+    setAuthAction('edit or delete a release');
+    setIsAuthModalOpen(true);
+  };
+
+  const handleAuthenticate = () => {
+    setIsAdmin(true);
+    setIsAuthModalOpen(false);
   };
 
   const exportToCSV = () => {
@@ -141,8 +174,10 @@ function App() {
           <ReleaseTable
             releases={filteredReleases}
             onEdit={handleEditRelease}
-            onDelete={deleteRelease}
+            onDelete={handleDeleteRelease}
             onViewDetails={handleViewDetails}
+            isAdmin={isAdmin}
+            onAuthRequired={handleAuthRequired}
           />
         </div>
 
@@ -194,7 +229,7 @@ function App() {
                     Edit
                   </button>
                   <button
-                    onClick={() => deleteRelease(release.id)}
+                    onClick={() => handleDeleteRelease(release.id)}
                     className="px-3 py-2 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
                   >
                     Delete
@@ -234,6 +269,13 @@ function App() {
           setSelectedRelease(null);
         }}
         release={selectedRelease}
+      />
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthenticate={handleAuthenticate}
+        action={authAction}
       />
     </div>
   );
