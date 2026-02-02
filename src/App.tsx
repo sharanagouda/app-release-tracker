@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Filter, Search, Download, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Filter, Search, Download, ExternalLink, LogOut } from 'lucide-react';
 import { Release, FilterOptions } from './types/release';
 import { useReleases } from './hooks/useReleases';
 import { ReleaseTable } from './components/ReleaseTable';
@@ -8,6 +8,7 @@ import { ReleaseDetailsModal } from './components/ReleaseDetailsModal';
 import { AuthModal } from './components/AuthModal';
 import { FilterBar } from './components/FilterBar';
 import { StatCard } from './components/StatCard';
+import { onAuthChange, logout } from './services/firebaseAuth';
 
 function App() {
   const { releases, addRelease, updateRelease, deleteRelease } = useReleases();
@@ -20,6 +21,18 @@ function App() {
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState<Partial<FilterOptions>>({});
+
+  useEffect(() => {
+    const unsubscribe = onAuthChange((user) => {
+      setIsAdmin(!!user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    setIsAdmin(false);
+  };
 
   const getOverallStatus = (release: Release) => {
     const platforms = release.platforms || [];
@@ -92,7 +105,6 @@ function App() {
   };
 
   const handleAuthenticate = () => {
-    setIsAdmin(true);
     setIsAuthModalOpen(false);
   };
 
@@ -116,9 +128,20 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Release Tracker</h1>
-          <p className="text-gray-600">Track and manage your application releases across all platforms</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Release Tracker</h1>
+            <p className="text-gray-600">Track and manage your application releases across all platforms</p>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </button>
+          )}
         </div>
 
         {/* Current Release Status */}

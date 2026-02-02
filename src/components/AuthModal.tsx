@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Lock } from 'lucide-react';
+import { signin, signup } from '../services/firebaseAuth';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -14,29 +15,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onAuthenticate,
   action,
 }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (username === 'admin' && password === 'admin') {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      if (isSignup) {
+        await signup(email, password);
+      } else {
+        await signin(email, password);
+      }
       onAuthenticate();
-      onClose();
-      setUsername('');
-      setPassword('');
-      setError('');
-    } else {
-      setError('Invalid username or password');
+      handleClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Authentication failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleClose = () => {
     onClose();
-    setUsername('');
+    setEmail('');
     setPassword('');
     setError('');
+    setIsSignup(false);
   };
 
   if (!isOpen) return null;
@@ -61,7 +71,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6">
           <p className="text-sm text-gray-600 mb-4">
-            Please enter your credentials to {action}.
+            {isSignup ? 'Create an account' : 'Sign in'} to {action}.
           </p>
 
           {error && (
@@ -73,15 +83,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Username
+                Email
               </label>
               <input
-                type="text"
+                type="email"
                 required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter username"
+                placeholder="Enter email"
               />
             </div>
 
@@ -95,10 +105,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter password"
+                placeholder="Enter password (minimum 6 characters)"
               />
             </div>
           </div>
+
+          <p className="text-xs text-gray-600 mt-3">
+            {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
+            <button
+              type="button"
+              onClick={() => setIsSignup(!isSignup)}
+              className="text-blue-600 hover:text-blue-700 font-medium"
+            >
+              {isSignup ? 'Sign in' : 'Sign up'}
+            </button>
+          </p>
 
           <div className="flex justify-end space-x-3 mt-6">
             <button
@@ -110,9 +131,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-150"
+              disabled={isLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-150 disabled:bg-gray-400"
             >
-              Authenticate
+              {isLoading ? 'Loading...' : isSignup ? 'Sign up' : 'Sign in'}
             </button>
           </div>
         </form>
