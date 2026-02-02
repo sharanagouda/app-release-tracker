@@ -1,0 +1,38 @@
+type User @table {
+  username: String!
+  email: String
+  profilePictureUrl: String
+  createdAt: Timestamp!
+}
+
+type Application @table {
+  name: String!
+  description: String
+  officialWebsiteUrl: String
+  logoUrl: String
+  createdAt: Timestamp!
+}
+
+type Release @table {
+  application: Application!
+  versionNumber: String!
+  releaseDate: Date!
+  keyFeatures: String
+  releaseNotesUrl: String
+  createdAt: Timestamp!
+}
+
+type NotificationPreference @table {
+  user: User!
+  application: Application!
+  notificationType: String!
+  enabled: Boolean!
+  createdAt: Timestamp!
+}
+
+type Comment @table {
+  user: User!
+  release: Release!
+  text: String!
+  createdAt: Timestamp!
+}
