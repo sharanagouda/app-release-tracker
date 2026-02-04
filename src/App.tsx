@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Filter, Search, Download, ExternalLink, LogOut } from 'lucide-react';
 import { Release, FilterOptions } from './types/release';
+import { exportToCSVFunction, exportToJSONFunction } from './utils/export';
 import { useReleases } from './hooks/useReleases';
 import { ReleaseTable } from './components/ReleaseTable';
 import { ReleaseModal } from './components/ReleaseModal';
@@ -141,11 +142,13 @@ function App() {
 
   const exportToCSV = () => {
     // CSV export functionality
+    exportToCSVFunction(releases);
     console.log('Exporting to CSV...');
   };
 
   const exportToJSON = () => {
     // JSON export functionality
+    exportToJSONFunction(releases);
     console.log('Exporting to JSON...');
   };
   const stats = {

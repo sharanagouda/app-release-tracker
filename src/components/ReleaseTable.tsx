@@ -1,6 +1,6 @@
 import React from 'react';
 import { Edit, Trash2, Eye, Monitor, Smartphone, Tablet } from 'lucide-react';
-import { Release } from '../types/release';
+import { Release, PlatformRelease, ConceptRelease } from '../types/release';
 
 interface ReleaseTableProps {
   releases: Release[];
@@ -43,9 +43,31 @@ const getStatusBadge = (status: string) => {
       return `${baseClasses} bg-yellow-100 text-yellow-800`;
     case 'failed':
       return `${baseClasses} bg-red-100 text-red-800`;
+    case 'not started':
+      return `${baseClasses} bg-gray-100 text-gray-800`;
     default:
       return `${baseClasses} bg-gray-100 text-gray-800`;
   }
+};
+
+// Helper to get concept releases from platform (handles both old and new format)
+const getConceptReleases = (platform: PlatformRelease): ConceptRelease[] => {
+  // New format - has conceptReleases array
+  if (platform.conceptReleases && platform.conceptReleases.length > 0) {
+    return platform.conceptReleases;
+  }
+  
+  // Old format - migrate to new format on the fly
+  return [{
+    id: `${platform.platform}-legacy`,
+    concepts: platform.concepts || ['All Concepts'],
+    version: platform.version || '',
+    buildId: platform.buildId || '',
+    rolloutPercentage: platform.rolloutPercentage || 0,
+    status: platform.status || 'Not Started',
+    notes: platform.notes || '',
+    buildLink: platform.buildLink || ''
+  }];
 };
 
 export const ReleaseTable: React.FC<ReleaseTableProps> = ({
@@ -106,9 +128,25 @@ export const ReleaseTable: React.FC<ReleaseTableProps> = ({
         <tbody className="bg-white divide-y divide-gray-200">
           {releases.map((release) => {
             const platforms = Array.isArray(release.platforms) ? release.platforms : [];
-            const allComplete = platforms.length > 0 && platforms.every(p => p && p.status === 'Complete');
-            const allPaused = platforms.length > 0 && platforms.every(p => p && p.status === 'Paused');
-            const overallStatus = allComplete ? 'Complete' : allPaused ? 'Paused' : 'In Progress';
+            
+            // Calculate overall status from all concept releases
+            let allComplete = true;
+            let allPaused = true;
+            let hasAnyRelease = false;
+            
+            platforms.forEach(platform => {
+              const conceptReleases = getConceptReleases(platform);
+              conceptReleases.forEach(cr => {
+                hasAnyRelease = true;
+                if (cr.status !== 'Complete') allComplete = false;
+                if (cr.status !== 'Paused') allPaused = false;
+              });
+            });
+            
+            const overallStatus = !hasAnyRelease ? 'Not Started' : 
+                                 allComplete ? 'Complete' : 
+                                 allPaused ? 'Paused' : 
+                                 'In Progress';
 
             return (
               <tr 
@@ -132,53 +170,91 @@ export const ReleaseTable: React.FC<ReleaseTableProps> = ({
                 
                 <td className="px-4 py-4">
                   <div className="space-y-2 min-w-0">
-                    {platforms.map((platform, index) => (
-                      <div key={index} className="bg-gray-50 rounded-lg px-2 py-2 flex items-center space-x-2 min-w-0">
-                        <span className="text-lg">{getPlatformIcon(platform?.platform || '')}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                            {platform?.platform || 'Unknown'}
-                          </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            v{platform?.version || 'N/A'} • Build {platform?.buildId || 'N/A'}
-                          </div>
-                          <div className="text-xs text-blue-600 truncate mt-0.5">
-                            {(platform?.concepts || ['All Concepts']).join(', ')}
-                          </div>
+                    {platforms.map((platform, platformIndex) => {
+                      const conceptReleases = getConceptReleases(platform);
+                      
+                      return (
+                        <div key={platformIndex} className="space-y-1">
+                          {conceptReleases.map((conceptRelease, crIndex) => (
+                            <div 
+                              key={conceptRelease.id} 
+                              className="bg-gray-50 rounded-lg px-2 py-2 flex items-center space-x-2 min-w-0"
+                            >
+                              <span className="text-lg">{getPlatformIcon(platform.platform)}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                                  {platform.platform}
+                                  {conceptReleases.length > 1 && (
+                                    <span className="ml-1 text-gray-400">#{crIndex + 1}</span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate">
+                                  v{conceptRelease.version || 'N/A'} • Build {conceptRelease.buildId || 'N/A'}
+                                </div>
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                  {conceptRelease.concepts.map((concept, idx) => (
+                                    <span 
+                                      key={idx}
+                                      className="inline-block px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded"
+                                    >
+                                      {concept}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </td>
 
                 <td className="px-4 py-4">
-                  <div className="space-y-2 min-w-0">
-                    {platforms.map((platform, index) => (
-                      <div key={index} className="flex flex-col space-y-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm">{getPlatformIcon(platform?.platform || '')}</span>
-                            <span className="text-xs font-medium text-gray-700 truncate min-w-0">
-                              {platform?.platform || 'Unknown'}
-                            </span>
-                          </div>
-                          <span className={getStatusBadge(platform?.status || 'Unknown')}>
-                            {platform?.status === 'In Progress' ? 'Progress' : platform?.status || 'Unknown'}
-                          </span>
+                  <div className="space-y-3 min-w-0">
+                    {platforms.map((platform, platformIndex) => {
+                      const conceptReleases = getConceptReleases(platform);
+                      
+                      return (
+                        <div key={platformIndex} className="space-y-2">
+                          {conceptReleases.map((conceptRelease, crIndex) => (
+                            <div key={conceptRelease.id} className="flex flex-col space-y-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm">{getPlatformIcon(platform.platform)}</span>
+                                  <span className="text-xs font-medium text-gray-700 truncate min-w-0">
+                                    {platform.platform}
+                                    {conceptReleases.length > 1 && (
+                                      <span className="ml-1 text-gray-400">#{crIndex + 1}</span>
+                                    )}
+                                  </span>
+                                </div>
+                                <span className={getStatusBadge(conceptRelease.status)}>
+                                  {conceptRelease.status === 'In Progress' ? 'Progress' : conceptRelease.status}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2 min-w-0">
+                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(conceptRelease.rolloutPercentage)}`}
+                                    style={{ width: `${conceptRelease.rolloutPercentage}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs font-medium text-gray-900 min-w-[30px] text-right flex-shrink-0">
+                                  {conceptRelease.rolloutPercentage}%
+                                </span>
+                              </div>
+                              {/* Show concepts for this release */}
+                              {conceptReleases.length > 1 && (
+                                <div className="text-xs text-gray-500 truncate ml-6">
+                                  {conceptRelease.concepts.join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center space-x-2 min-w-0">
-                          <div className="flex-1 bg-gray-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(platform?.rolloutPercentage || 0)}`}
-                              style={{ width: `${platform?.rolloutPercentage || 0}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium text-gray-900 min-w-[30px] text-right flex-shrink-0">
-                            {platform?.rolloutPercentage || 0}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </td>
 

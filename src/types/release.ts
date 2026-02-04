@@ -1,10 +1,24 @@
-export interface PlatformRelease {
-  platform: 'iOS' | 'Android GMS' | 'Android HMS';
+export interface ConceptRelease {
+  id: string;
+  concepts: string[]; // ['CP'] or ['All Concepts'] or ['CP', 'MX', 'SP']
   version: string;
   buildId: string;
   rolloutPercentage: number;
-  status: 'Complete' | 'In Progress' | 'Paused';
-  concepts: string[]; // New field for concept selection per platform
+  status: 'Complete' | 'In Progress' | 'Paused' | 'Not Started';
+  notes?: string;
+  buildLink?: string;
+  rolloutHistory?: RolloutHistoryEntry[];
+}
+
+export interface PlatformRelease {
+  platform: 'iOS' | 'Android GMS' | 'Android HMS';
+  conceptReleases: ConceptRelease[];
+  // Legacy fields for backward compatibility
+  version?: string;
+  buildId?: string;
+  rolloutPercentage?: number;
+  status?: 'In Progress' | 'Complete' | 'Paused' | 'On Hold';
+  concepts?: string[];
   notes?: string;
   buildLink?: string;
   rolloutHistory?: RolloutHistoryEntry[];
@@ -20,13 +34,14 @@ export interface Release {
   id: string;
   releaseDate: string;
   releaseName: string;
-  environment: string; // Changed from 'concept' to 'environment'
+  environment: string;
   platforms: PlatformRelease[];
   changes: string[];
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  // Keep concept for backward compatibility
+  
+  // Legacy field for backward compatibility
   concept?: string;
 }
 
@@ -45,6 +60,5 @@ export interface FilterOptions {
     end: string;
   };
   sortBy: string;
-  // Keep concept for backward compatibility
-  concept?: string;
+  concept?: string; // Keep for backward compatibility
 }

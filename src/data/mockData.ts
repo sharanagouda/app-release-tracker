@@ -181,46 +181,74 @@ export const mockReleases: Release[] = [
     updatedAt: '2025-01-02T14:30:00Z'
   },
   {
-    id: '3',
-    releaseDate: '2025-01-04',
-    releaseName: 'June-4 Release',
-    environment: 'PRODSTAGE',
-    platforms: [
-      {
-        platform: 'iOS',
-        version: '10.32.2',
-        buildId: '7040',
-        rolloutPercentage: 10,
-        status: 'In Progress',
-        concepts: ['All Concepts'],
-        notes: 'Native release rollout at 10%'
-      },
-      {
-        platform: 'Android GMS',
-        version: '8.83',
-        buildId: '7040',
-        rolloutPercentage: 50,
-        status: 'In Progress',
-        concepts: ['All Concepts'],
-        notes: 'Android native release rollout at 50%'
-      },
-      {
-        platform: 'Android HMS',
-        version: '8.83',
-        buildId: '7040',
-        rolloutPercentage: 100,
-        status: 'Complete',
-        concepts: ['All Concepts'],
-        notes: 'HMS rollout completed at 100%'
-      }
-    ],
-    changes: [
-      'Performance improvements',
-      'Bug fixes for checkout flow',
-      'UI/UX enhancements'
-    ],
-    notes: 'Native release rollout in progress across platforms',
-    createdAt: '2025-01-04T08:00:00Z',
-    updatedAt: '2025-01-04T12:00:00Z'
-  }
+  "id": "3",
+  "releaseDate": "2025-01-04",
+  "releaseName": "June-4 Release",
+  "environment": "PRODSTAGE",
+  "platforms": [
+    {
+      "platform": "iOS",
+      "conceptReleases": [
+        {
+          "id": "ios-1",
+          "concepts": ["CP"],
+          "version": "10.41.1",
+          "buildId": "8084",
+          "rolloutPercentage": 10,
+          "status": "In Progress",
+          "notes": "Centrepoint specific release",
+          "buildLink": "https://sharepoint.com/builds/cp-8084"
+        },
+        {
+          "id": "ios-2",
+          "concepts": ["MX", "SP", "BS", "HB", "HC", "EMAX", "MC"],
+          "version": "10.40.1",
+          "buildId": "8085",
+          "rolloutPercentage": 50,
+          "status": "In Progress",
+          "notes": "Other concepts release",
+          "buildLink": "https://sharepoint.com/builds/other-8085"
+        }
+      ]
+    },
+    {
+      "platform": "Android GMS",
+      "conceptReleases": [
+        {
+          "id": "android-gms-1",
+          "concepts": ["All Concepts"],
+          "version": "8.83",
+          "buildId": "7040",
+          "rolloutPercentage": 50,
+          "status": "In Progress",
+          "notes": "Android native release rollout at 50%",
+          "buildLink": ""
+        }
+      ]
+    },
+    {
+      "platform": "Android HMS",
+      "conceptReleases": [
+        {
+          "id": "android-hms-1",
+          "concepts": ["All Concepts"],
+          "version": "8.83",
+          "buildId": "7040",
+          "rolloutPercentage": 100,
+          "status": "Complete",
+          "notes": "HMS rollout completed at 100%",
+          "buildLink": ""
+        }
+      ]
+    }
+  ],
+  "changes": [
+    "Performance improvements",
+    "Bug fixes for checkout flow",
+    "UI/UX enhancements"
+  ],
+  "notes": "Native release rollout in progress across platforms",
+  "createdAt": "2025-01-04T08:00:00Z",
+  "updatedAt": "2025-01-04T12:00:00Z"
+},
 ];
