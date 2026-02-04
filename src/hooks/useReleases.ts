@@ -89,10 +89,6 @@ export const useReleases = () => {
     downloadJSON(releases);
   };
 
-  const exportToMockData = () => {
-    downloadMockData(releases);
-  };
-
   const exportToCSV = () => {
     downloadCSV(releases);
   };
@@ -138,7 +134,6 @@ export const useReleases = () => {
     filterReleases,
     importReleases,
     exportToJSON,
-    exportToMockData,
     exportToCSV,
   };
 };

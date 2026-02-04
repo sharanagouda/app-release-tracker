@@ -47,12 +47,43 @@ function App() {
   };
 
   const filteredReleases = releases.filter(release => {
-    const matchesSearch = release.releaseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         release.concept.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
-    const matchesConcept = !filters.concept || filters.concept === 'All' || release.concept === filters.concept;
+    const environment = release.environment || release.concept || '';
+    const searchLower = searchTerm.toLowerCase();
     
-    return matchesSearch && matchesStatus && matchesConcept;
+    // Enhanced search: name, environment, version, buildId
+    const matchesSearch = release.releaseName.toLowerCase().includes(searchLower) ||
+                         environment.toLowerCase().includes(searchLower) ||
+                         release.platforms.some(p => 
+                           p.version.toLowerCase().includes(searchLower) ||
+                           p.buildId.toLowerCase().includes(searchLower)
+                         );
+    
+    const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
+    const matchesEnvironment = !filters.environment || filters.environment === 'All' || environment === filters.environment;
+    
+    return matchesSearch && matchesStatus && matchesEnvironment;
+  }).sort((a, b) => {
+    // Apply sorting
+    switch (filters.sortBy) {
+      case 'releaseDate':
+        return new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime();
+      case 'lastUpdate':
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      case 'completed':
+        const aComplete = getOverallStatus(a) === 'Complete' ? 1 : 0;
+        const bComplete = getOverallStatus(b) === 'Complete' ? 1 : 0;
+        return bComplete - aComplete;
+      case 'inProgress':
+        const aProgress = getOverallStatus(a) === 'In Progress' ? 1 : 0;
+        const bProgress = getOverallStatus(b) === 'In Progress' ? 1 : 0;
+        return bProgress - aProgress;
+      case 'paused':
+        const aPaused = getOverallStatus(a) === 'Paused' ? 1 : 0;
+        const bPaused = getOverallStatus(b) === 'Paused' ? 1 : 0;
+        return bPaused - aPaused;
+      default:
+        return 0;
+    }
   });
 
   const handleAddRelease = () => {
@@ -215,11 +246,15 @@ function App() {
             };
 
             return (
-              <div key={release.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div 
+                key={release.id} 
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleViewDetails(release)}
+              >
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-900">{release.releaseName}</h3>
-                    <p className="text-sm text-gray-600">{release.concept}</p>
+                    <p className="text-sm text-gray-600">{release.environment || release.concept}</p>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[overallStatus as keyof typeof statusColors]}`}>
                     {overallStatus}
@@ -238,7 +273,7 @@ function App() {
                   ))}
                 </div>
 
-                <div className="flex space-x-2">
+                <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => handleViewDetails(release)}
                     className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"

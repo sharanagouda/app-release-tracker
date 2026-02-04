@@ -96,8 +96,8 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                   <div className="flex items-center gap-3">
                     <Package className="h-5 w-5 text-blue-600" />
                     <div>
-                      <span className="text-sm font-medium text-gray-700">Concept:</span>
-                      <span className="ml-2 text-sm text-gray-900">{release.concept}</span>
+                      <span className="text-sm font-medium text-gray-700">Environment:</span>
+                      <span className="ml-2 text-sm text-gray-900">{release.environment || release.concept}</span>
                     </div>
                   </div>
                 </div>
@@ -192,6 +192,16 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                     <div>
                       <span className="text-xs lg:text-sm font-medium text-gray-700">Build ID:</span>
                       <span className="ml-2 text-xs lg:text-sm font-mono text-gray-900">{platform.buildId}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs lg:text-sm font-medium text-gray-700">Concepts:</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {(platform.concepts || ['All Concepts']).map((concept, idx) => (
+                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            {concept}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">

@@ -111,11 +111,18 @@ export const ReleaseTable: React.FC<ReleaseTableProps> = ({
             const overallStatus = allComplete ? 'Complete' : allPaused ? 'Paused' : 'In Progress';
 
             return (
-              <tr key={release.id} className="hover:bg-gray-50 transition-colors">
+              <tr 
+                key={release.id} 
+                className="hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => onViewDetails(release)}
+              >
                 <td className="px-4 py-4">
                   <div className="flex flex-col">
                     <div className="text-sm font-medium text-gray-900">
                       {release.releaseName}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {release.environment || release.concept}
                     </div>
                     <div className="text-xs text-gray-400 mt-1">
                       {new Date(release.releaseDate).toLocaleDateString()}
@@ -134,6 +141,9 @@ export const ReleaseTable: React.FC<ReleaseTableProps> = ({
                           </div>
                           <div className="text-xs text-gray-500 truncate">
                             v{platform?.version || 'N/A'} • Build {platform?.buildId || 'N/A'}
+                          </div>
+                          <div className="text-xs text-blue-600 truncate mt-0.5">
+                            {(platform?.concepts || ['All Concepts']).join(', ')}
                           </div>
                         </div>
                       </div>
@@ -178,7 +188,7 @@ export const ReleaseTable: React.FC<ReleaseTableProps> = ({
                   </span>
                 </td>
 
-                <td className="px-4 py-4">
+                <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => onViewDetails(release)}

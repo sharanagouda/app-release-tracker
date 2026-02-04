@@ -4,6 +4,7 @@ export interface PlatformRelease {
   buildId: string;
   rolloutPercentage: number;
   status: 'Complete' | 'In Progress' | 'Paused';
+  concepts: string[]; // New field for concept selection per platform
   notes?: string;
   buildLink?: string;
   rolloutHistory?: RolloutHistoryEntry[];
@@ -19,12 +20,14 @@ export interface Release {
   id: string;
   releaseDate: string;
   releaseName: string;
-  concept: string;
+  environment: string; // Changed from 'concept' to 'environment'
   platforms: PlatformRelease[];
   changes: string[];
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  // Keep concept for backward compatibility
+  concept?: string;
 }
 
 export interface ReleaseStats {
@@ -36,8 +39,12 @@ export interface ReleaseStats {
 
 export interface FilterOptions {
   status: string;
+  environment: string;
   dateRange: {
     start: string;
     end: string;
   };
+  sortBy: string;
+  // Keep concept for backward compatibility
+  concept?: string;
 }

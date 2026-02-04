@@ -1,21 +1,25 @@
 import { Release } from '../types/release';
 
+export const ENVIRONMENTS = [
+  'PROD',
+  'PRODSTAGE',
+  'UAT5',
+  'UAT6',
+  'UAT4',
+  'UAT2',
+  'UAT1'
+];
+
 export const CONCEPTS = [
   'All Concepts',
-  'All BLC Concepts (CP, HC, MX)',
-  'All Hybris Concepts',
-  'lifestyle',
-  'babyshop',
-  'splash',
-  'shoemart',
-  'centrepoint',
-  'shoexpress',
-  'mothercare',
-  'homecentre',
-  'homebox',
-  'max',
-  'hybris',
-  'blc'
+  'CP',
+  'MX',
+  'SP',
+  'BS',
+  'HB',
+  'HC',
+  'EMAX',
+  'MC'
 ];
 
 export const PLATFORMS = ['iOS', 'Android GMS', 'Android HMS'] as const;
@@ -25,7 +29,7 @@ export const mockReleases: Release[] = [
     id: '4',
     releaseDate: '2025-01-30',
     releaseName: 'BL_hotfix_30_July_2025',
-    concept: 'All BLC Concepts (CP, HC, MX)',
+    environment: 'UAT5',
     platforms: [
       {
         platform: 'iOS',
@@ -33,6 +37,7 @@ export const mockReleases: Release[] = [
         buildId: '7065',
         rolloutPercentage: 100,
         status: 'Complete',
+        concepts: ['CP', 'HC', 'MX'],
         notes: 'BLC codepush completed for all concepts',
         rolloutHistory: [
           {
@@ -58,6 +63,7 @@ export const mockReleases: Release[] = [
         buildId: '7065',
         rolloutPercentage: 100,
         status: 'Complete',
+        concepts: ['CP', 'HC', 'MX'],
         notes: 'BLC codepush completed - Build available at SharePoint',
         buildLink: 'https://landmarkgroup.sharepoint.com/:f:/r/sites/PlatformSquad/Shared%20Documents/General/BLC%20App%20builds/KW%20Launch/STAGE/8.91(1595)-7060?csf=1&web=1&e=RboBH7',
         rolloutHistory: [
@@ -92,7 +98,7 @@ export const mockReleases: Release[] = [
     id: '1',
     releaseDate: '2025-01-09',
     releaseName: 'July-9 Release',
-    concept: 'All Concepts',
+    environment: 'PROD',
     platforms: [
       {
         platform: 'iOS',
@@ -100,6 +106,7 @@ export const mockReleases: Release[] = [
         buildId: '7055',
         rolloutPercentage: 100,
         status: 'Complete',
+        concepts: ['All Concepts'],
         notes: 'iOS codepush completed with 100% rollout'
       },
       {
@@ -108,6 +115,7 @@ export const mockReleases: Release[] = [
         buildId: '7055',
         rolloutPercentage: 20,
         status: 'In Progress',
+        concepts: ['All Concepts'],
         notes: 'Native rollout is at 20% for Android GMS'
       },
       {
@@ -116,6 +124,7 @@ export const mockReleases: Release[] = [
         buildId: '7055',
         rolloutPercentage: 100,
         status: 'Complete',
+        concepts: ['All Concepts'],
         notes: 'HMS rollout completed'
       }
     ],
@@ -132,7 +141,7 @@ export const mockReleases: Release[] = [
     id: '2',
     releaseDate: '2025-01-02',
     releaseName: 'July-02 Release',
-    concept: 'All Concepts',
+    environment: 'PROD',
     platforms: [
       {
         platform: 'iOS',
@@ -140,6 +149,7 @@ export const mockReleases: Release[] = [
         buildId: '7050',
         rolloutPercentage: 50,
         status: 'Paused',
+        concepts: ['All Concepts'],
         notes: 'iOS kept in staged rollout at 50%'
       },
       {
@@ -148,6 +158,7 @@ export const mockReleases: Release[] = [
         buildId: '7050',
         rolloutPercentage: 0,
         status: 'Paused',
+        concepts: ['All Concepts'],
         notes: 'Codepush paused due to application issues'
       },
       {
@@ -156,6 +167,7 @@ export const mockReleases: Release[] = [
         buildId: '7050',
         rolloutPercentage: 0,
         status: 'Paused',
+        concepts: ['All Concepts'],
         notes: 'Codepush paused due to application issues'
       }
     ],
@@ -172,7 +184,7 @@ export const mockReleases: Release[] = [
     id: '3',
     releaseDate: '2025-01-04',
     releaseName: 'June-4 Release',
-    concept: 'All Concepts',
+    environment: 'PRODSTAGE',
     platforms: [
       {
         platform: 'iOS',
@@ -180,6 +192,7 @@ export const mockReleases: Release[] = [
         buildId: '7040',
         rolloutPercentage: 10,
         status: 'In Progress',
+        concepts: ['All Concepts'],
         notes: 'Native release rollout at 10%'
       },
       {
@@ -188,6 +201,7 @@ export const mockReleases: Release[] = [
         buildId: '7040',
         rolloutPercentage: 50,
         status: 'In Progress',
+        concepts: ['All Concepts'],
         notes: 'Android native release rollout at 50%'
       },
       {
@@ -196,6 +210,7 @@ export const mockReleases: Release[] = [
         buildId: '7040',
         rolloutPercentage: 100,
         status: 'Complete',
+        concepts: ['All Concepts'],
         notes: 'HMS rollout completed at 100%'
       }
     ],

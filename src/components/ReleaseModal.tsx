@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Release, PlatformRelease } from '../types/release';
-import { CONCEPTS, PLATFORMS } from '../data/mockData';
+import { ENVIRONMENTS, CONCEPTS, PLATFORMS } from '../data/mockData';
 
 interface ReleaseModalProps {
   isOpen: boolean;
@@ -16,6 +16,7 @@ const initialPlatformData: PlatformRelease = {
   buildId: '',
   rolloutPercentage: 0,
   status: 'In Progress',
+  concepts: ['All Concepts'],
   notes: ''
 };
 
@@ -28,7 +29,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
   const [formData, setFormData] = useState({
     releaseDate: '',
     releaseName: '',
-    concept: '',
+    environment: '',
     platforms: [
       { ...initialPlatformData, platform: 'iOS' as const },
       { ...initialPlatformData, platform: 'Android GMS' as const },
@@ -43,8 +44,11 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
       setFormData({
         releaseDate: editingRelease.releaseDate,
         releaseName: editingRelease.releaseName,
-        concept: editingRelease.concept,
-        platforms: editingRelease.platforms,
+        environment: editingRelease.environment || editingRelease.concept || '',
+        platforms: editingRelease.platforms.map(p => ({
+          ...p,
+          concepts: p.concepts || ['All Concepts']
+        })),
         changes: editingRelease.changes,
         notes: editingRelease.notes || '',
       });
@@ -52,7 +56,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
       setFormData({
         releaseDate: '',
         releaseName: '',
-        concept: '',
+        environment: '',
         platforms: [
           { ...initialPlatformData, platform: 'iOS' },
           { ...initialPlatformData, platform: 'Android GMS' },
@@ -105,6 +109,62 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
       ...prev,
       changes: prev.changes.map((change, i) => i === index ? value : change),
     }));
+  };
+
+  const handleChangeKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (formData.changes[index].trim() !== '') {
+        addChange();
+        // Focus on the next input after a short delay
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('input[placeholder="Describe the change..."]');
+          const nextInput = inputs[index + 1] as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 50);
+      }
+    }
+  };
+
+  const toggleConcept = (platformIndex: number, concept: string) => {
+    setFormData(prev => {
+      const updatedPlatforms = [...prev.platforms];
+      const currentConcepts = updatedPlatforms[platformIndex].concepts || [];
+      
+      if (concept === 'All Concepts') {
+        // If "All Concepts" is selected, clear all other selections
+        updatedPlatforms[platformIndex] = {
+          ...updatedPlatforms[platformIndex],
+          concepts: ['All Concepts']
+        };
+      } else {
+        // Remove "All Concepts" if present and toggle the specific concept
+        let newConcepts = currentConcepts.filter(c => c !== 'All Concepts');
+        
+        if (newConcepts.includes(concept)) {
+          newConcepts = newConcepts.filter(c => c !== concept);
+        } else {
+          newConcepts.push(concept);
+        }
+        
+        // If no concepts are selected, default to "All Concepts"
+        if (newConcepts.length === 0) {
+          newConcepts = ['All Concepts'];
+        }
+        
+        updatedPlatforms[platformIndex] = {
+          ...updatedPlatforms[platformIndex],
+          concepts: newConcepts
+        };
+      }
+      
+      return {
+        ...prev,
+        platforms: updatedPlatforms
+      };
+    });
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -169,17 +229,17 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Concept
+                Environment
               </label>
               <select
                 required
-                value={formData.concept}
-                onChange={(e) => setFormData(prev => ({ ...prev, concept: e.target.value }))}
+                value={formData.environment}
+                onChange={(e) => setFormData(prev => ({ ...prev, environment: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">Select Concept</option>
-                {CONCEPTS.map(concept => (
-                  <option key={concept} value={concept}>{concept}</option>
+                <option value="">Select Environment</option>
+                {ENVIRONMENTS.map(env => (
+                  <option key={env} value={env}>{env}</option>
                 ))}
               </select>
             </div>
@@ -279,6 +339,32 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Concept Selection */}
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Concepts
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {CONCEPTS.map(concept => (
+                        <button
+                          key={concept}
+                          type="button"
+                          onClick={() => toggleConcept(index, concept)}
+                          className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                            (platform.concepts || ['All Concepts']).includes(concept)
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {concept}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Selected: {(platform.concepts || ['All Concepts']).join(', ')}
+                    </p>
+                  </div>
+
                   <div className="mt-3">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Platform Notes
@@ -322,6 +408,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
                     type="text"
                     value={change}
                     onChange={(e) => updateChange(index, e.target.value)}
+                    onKeyPress={(e) => handleChangeKeyPress(e, index)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Describe the change..."
                   />
