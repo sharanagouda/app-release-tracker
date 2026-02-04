@@ -49,7 +49,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <option value="paused">Paused</option>
             </select>
 
-            <select
+            {/* <select
               value={filters.status || 'All'}
               onChange={(e) => onFiltersChange({ ...filters, status: e.target.value === 'All' ? undefined : e.target.value })}
              className="px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
@@ -59,8 +59,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <option value="Complete">Complete</option>
               <option value="In Progress">In Progress</option>
               <option value="Paused">Paused</option>
-            </select>
-
+            </select> */}
+{/* 
             <select
               value={filters.environment || 'All'}
               onChange={(e) => onFiltersChange({ ...filters, environment: e.target.value === 'All' ? undefined : e.target.value })}
@@ -71,7 +71,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               {ENVIRONMENTS.map(env => (
                 <option key={env} value={env}>{env}</option>
               ))}
-            </select>
+            </select> */}
           </div>
         </div>
         
