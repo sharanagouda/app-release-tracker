@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { Release, PlatformRelease } from '../types/release';
+import { Release, PlatformRelease, ConceptRelease } from '../types/release';
 import { ENVIRONMENTS, CONCEPTS, PLATFORMS } from '../data/mockData';
 
 interface ReleaseModalProps {
@@ -10,14 +10,20 @@ interface ReleaseModalProps {
   editingRelease?: Release;
 }
 
-const initialPlatformData: PlatformRelease = {
-  platform: 'iOS',
+const initialConceptRelease: ConceptRelease = {
+  id: '',
+  concepts: ['All Concepts'],
   version: '',
   buildId: '',
   rolloutPercentage: 0,
   status: 'In Progress',
-  concepts: ['All Concepts'],
-  notes: ''
+  notes: '',
+  buildLink: ''
+};
+
+const initialPlatformData: PlatformRelease = {
+  platform: 'iOS',
+  conceptReleases: [{ ...initialConceptRelease }]
 };
 
 export const ReleaseModal: React.FC<ReleaseModalProps> = ({
@@ -31,9 +37,9 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
     releaseName: '',
     environment: '',
     platforms: [
-      { ...initialPlatformData, platform: 'iOS' as const },
-      { ...initialPlatformData, platform: 'Android GMS' as const },
-      { ...initialPlatformData, platform: 'Android HMS' as const }
+      { platform: 'iOS' as const, conceptReleases: [{ ...initialConceptRelease }] },
+      { platform: 'Android GMS' as const, conceptReleases: [{ ...initialConceptRelease }] },
+      { platform: 'Android HMS' as const, conceptReleases: [{ ...initialConceptRelease }] }
     ] as PlatformRelease[],
     changes: [''],
     notes: '',
@@ -41,14 +47,34 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
 
   useEffect(() => {
     if (editingRelease) {
+      // Convert old format to new format if needed
+      const convertedPlatforms = editingRelease.platforms.map(p => {
+        if ('conceptReleases' in p && p.conceptReleases && Array.isArray(p.conceptReleases)) {
+          return p;
+        } else {
+          // Convert old single-release format to conceptReleases format
+          return {
+            platform: p.platform,
+            conceptReleases: [{
+              id: `${p.platform.toLowerCase().replace(/\s+/g, '-')}-1`,
+              concepts: p.concepts || ['All Concepts'],
+              version: p.version || '',
+              buildId: p.buildId || '',
+              rolloutPercentage: p.rolloutPercentage || 0,
+              status: p.status || 'In Progress',
+              notes: p.notes || '',
+              buildLink: p.buildLink || '',
+              rolloutHistory: p.rolloutHistory || []
+            }]
+          };
+        }
+      });
+
       setFormData({
         releaseDate: editingRelease.releaseDate,
         releaseName: editingRelease.releaseName,
         environment: editingRelease.environment || editingRelease.concept || '',
-        platforms: editingRelease.platforms.map(p => ({
-          ...p,
-          concepts: p.concepts || ['All Concepts']
-        })),
+        platforms: convertedPlatforms,
         changes: editingRelease.changes,
         notes: editingRelease.notes || '',
       });
@@ -58,9 +84,9 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
         releaseName: '',
         environment: '',
         platforms: [
-          { ...initialPlatformData, platform: 'iOS' },
-          { ...initialPlatformData, platform: 'Android GMS' },
-          { ...initialPlatformData, platform: 'Android HMS' }
+          { platform: 'iOS', conceptReleases: [{ ...initialConceptRelease }] },
+          { platform: 'Android GMS', conceptReleases: [{ ...initialConceptRelease }] },
+          { platform: 'Android HMS', conceptReleases: [{ ...initialConceptRelease }] }
         ],
         changes: [''],
         notes: '',
@@ -71,7 +97,12 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const filteredChanges = formData.changes.filter(change => change.trim() !== '');
-    const validPlatforms = formData.platforms.filter(p => p.version && p.buildId);
+    
+    // Filter out platforms with no valid concept releases
+    const validPlatforms = formData.platforms.map(p => ({
+      ...p,
+      conceptReleases: (p.conceptReleases || []).filter(cr => cr.version && cr.buildId)
+    })).filter(p => p.conceptReleases && p.conceptReleases.length > 0);
     
     onSave({
       ...formData,
@@ -81,12 +112,73 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
     onClose();
   };
 
-  const updatePlatform = (index: number, field: keyof PlatformRelease, value: any) => {
+  const addConceptRelease = (platformIndex: number) => {
+    setFormData(prev => {
+      const updatedPlatforms = [...prev.platforms];
+      const platform = updatedPlatforms[platformIndex];
+      
+      if (!platform || !platform.conceptReleases) {
+        return prev;
+      }
+      
+      const newId = `${platform.platform.toLowerCase().replace(/\s+/g, '-')}-${platform.conceptReleases.length + 1}`;
+      
+      updatedPlatforms[platformIndex] = {
+        ...platform,
+        conceptReleases: [
+          ...platform.conceptReleases,
+          { ...initialConceptRelease, id: newId }
+        ]
+      };
+      
+      return {
+        ...prev,
+        platforms: updatedPlatforms
+      };
+    });
+  };
+
+  const removeConceptRelease = (platformIndex: number, conceptIndex: number) => {
+    setFormData(prev => {
+      const updatedPlatforms = [...prev.platforms];
+      const platform = updatedPlatforms[platformIndex];
+      
+      if (!platform || !platform.conceptReleases) {
+        return prev;
+      }
+      
+      updatedPlatforms[platformIndex] = {
+        ...platform,
+        conceptReleases: platform.conceptReleases.filter((_, i) => i !== conceptIndex)
+      };
+      
+      return {
+        ...prev,
+        platforms: updatedPlatforms
+      };
+    });
+  };
+
+  const updateConceptRelease = (
+    platformIndex: number, 
+    conceptIndex: number, 
+    field: keyof ConceptRelease, 
+    value: any
+  ) => {
     setFormData(prev => ({
       ...prev,
-      platforms: prev.platforms.map((platform, i) => 
-        i === index ? { ...platform, [field]: value } : platform
-      )
+      platforms: prev.platforms.map((platform, pIdx) => {
+        if (pIdx !== platformIndex || !platform.conceptReleases) {
+          return platform;
+        }
+        
+        return {
+          ...platform,
+          conceptReleases: platform.conceptReleases.map((cr, cIdx) => 
+            cIdx === conceptIndex ? { ...cr, [field]: value } : cr
+          )
+        };
+      })
     }));
   };
 
@@ -116,7 +208,6 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
       e.preventDefault();
       if (formData.changes[index].trim() !== '') {
         addChange();
-        // Focus on the next input after a short delay
         setTimeout(() => {
           const inputs = document.querySelectorAll('input[placeholder="Describe the change..."]');
           const nextInput = inputs[index + 1] as HTMLInputElement;
@@ -128,37 +219,42 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
     }
   };
 
-  const toggleConcept = (platformIndex: number, concept: string) => {
+  const toggleConcept = (platformIndex: number, conceptIndex: number, concept: string) => {
     setFormData(prev => {
       const updatedPlatforms = [...prev.platforms];
-      const currentConcepts = updatedPlatforms[platformIndex].concepts || [];
+      const platform = updatedPlatforms[platformIndex];
+      
+      if (!platform || !platform.conceptReleases || !platform.conceptReleases[conceptIndex]) {
+        return prev;
+      }
+      
+      const conceptRelease = platform.conceptReleases[conceptIndex];
+      const currentConcepts = conceptRelease.concepts || [];
+      
+      let newConcepts: string[];
       
       if (concept === 'All Concepts') {
-        // If "All Concepts" is selected, clear all other selections
-        updatedPlatforms[platformIndex] = {
-          ...updatedPlatforms[platformIndex],
-          concepts: ['All Concepts']
-        };
+        newConcepts = ['All Concepts'];
       } else {
         // Remove "All Concepts" if present and toggle the specific concept
-        let newConcepts = currentConcepts.filter(c => c !== 'All Concepts');
+        let filtered = currentConcepts.filter(c => c !== 'All Concepts');
         
-        if (newConcepts.includes(concept)) {
-          newConcepts = newConcepts.filter(c => c !== concept);
+        if (filtered.includes(concept)) {
+          filtered = filtered.filter(c => c !== concept);
         } else {
-          newConcepts.push(concept);
+          filtered.push(concept);
         }
         
         // If no concepts are selected, default to "All Concepts"
-        if (newConcepts.length === 0) {
-          newConcepts = ['All Concepts'];
-        }
-        
-        updatedPlatforms[platformIndex] = {
-          ...updatedPlatforms[platformIndex],
-          concepts: newConcepts
-        };
+        newConcepts = filtered.length === 0 ? ['All Concepts'] : filtered;
       }
+      
+      updatedPlatforms[platformIndex] = {
+        ...platform,
+        conceptReleases: platform.conceptReleases.map((cr, idx) =>
+          idx === conceptIndex ? { ...cr, concepts: newConcepts } : cr
+        )
+      };
       
       return {
         ...prev,
@@ -184,8 +280,8 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
           <h2 className="text-xl font-semibold text-gray-900">
             {editingRelease ? 'Edit Release' : 'Add New Release'}
           </h2>
@@ -202,7 +298,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Release Date
+                Release Date <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -215,7 +311,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Release Name
+                Release Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -229,7 +325,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Environment
+                Environment <span className="text-red-500">*</span>
               </label>
               <select
                 required
@@ -248,148 +344,192 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
           {/* Platform Details */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Platform Details</h3>
-            <div className="space-y-4">
-              {formData.platforms.map((platform, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-center mb-3">
-                    <span className="text-lg mr-2">{getPlatformIcon(platform.platform)}</span>
-                    <h4 className="font-medium text-gray-900">{platform.platform}</h4>
+            <div className="space-y-6">
+              {formData.platforms.map((platform, platformIndex) => (
+                <div key={platformIndex} className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-2">{getPlatformIcon(platform.platform)}</span>
+                      <h4 className="font-semibold text-gray-900 text-lg">{platform.platform}</h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addConceptRelease(platformIndex)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors duration-150"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Release Version
+                    </button>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Version
-                      </label>
-                      <input
-                        type="text"
-                        value={platform.version}
-                        onChange={(e) => updatePlatform(index, 'version', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="e.g., 10.34.2"
-                      />
-                    </div>
+                  <div className="space-y-4">
+                    {(platform.conceptReleases || []).map((conceptRelease, conceptIndex) => (
+                      <div key={conceptIndex} className="bg-white rounded-lg p-4 border border-gray-300 relative">
+                        {platform.conceptReleases && platform.conceptReleases.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeConceptRelease(platformIndex, conceptIndex)}
+                            className="absolute top-2 right-2 text-red-600 hover:text-red-800 transition-colors duration-150"
+                            title="Remove this release version"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        )}
+                        
+                        <div className="mb-3">
+                          <span className="text-xs font-medium text-gray-500">
+                            Release Version #{conceptIndex + 1}
+                          </span>
+                        </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Build ID
-                      </label>
-                      <input
-                        type="text"
-                        value={platform.buildId}
-                        onChange={(e) => updatePlatform(index, 'buildId', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="e.g., 7055"
-                      />
-                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Version <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={conceptRelease.version}
+                              onChange={(e) => updateConceptRelease(platformIndex, conceptIndex, 'version', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="e.g., 10.34.2"
+                            />
+                          </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Rollout %
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={platform.rolloutPercentage}
-                        onChange={(e) => {
-                          const percentage = Number(e.target.value);
-                          const currentPercentage = platform.rolloutPercentage;
-                          
-                          // Add to rollout history if percentage changed
-                          if (percentage !== currentPercentage) {
-                            const newHistoryEntry = {
-                              percentage: percentage,
-                              date: new Date().toISOString(),
-                              notes: `Updated from ${currentPercentage}% to ${percentage}%`
-                            };
-                            
-                            const updatedHistory = [...(platform.rolloutHistory || []), newHistoryEntry];
-                            updatePlatform(index, 'rolloutHistory', updatedHistory);
-                          }
-                          
-                          updatePlatform(index, 'rolloutPercentage', percentage);
-                          // Auto-update status based on percentage
-                          const newStatus = percentage === 100 ? 'Complete' : 
-                                          percentage === 0 ? 'Paused' : 'In Progress';
-                          updatePlatform(index, 'status', newStatus);
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Build ID <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={conceptRelease.buildId}
+                              onChange={(e) => updateConceptRelease(platformIndex, conceptIndex, 'buildId', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="e.g., 7055"
+                            />
+                          </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status (Auto-updated)
-                      </label>
-                      <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
-                        {platform.rolloutPercentage === 100 ? 'Complete' : 
-                         platform.rolloutPercentage === 0 ? 'Paused' : 'In Progress'}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Rollout % <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              max="100"
+                              value={conceptRelease.rolloutPercentage}
+                              onChange={(e) => {
+                                const percentage = Number(e.target.value);
+                                const currentPercentage = conceptRelease.rolloutPercentage;
+                                
+                                // Add to rollout history if percentage changed
+                                if (percentage !== currentPercentage) {
+                                  const newHistoryEntry = {
+                                    percentage: percentage,
+                                    date: new Date().toISOString(),
+                                    notes: `Updated from ${currentPercentage}% to ${percentage}%`
+                                  };
+                                  
+                                  const updatedHistory = [...(conceptRelease.rolloutHistory || []), newHistoryEntry];
+                                  updateConceptRelease(platformIndex, conceptIndex, 'rolloutHistory', updatedHistory);
+                                  
+                                  // Auto-suggest status based on percentage (user can still override)
+                                  const suggestedStatus = percentage === 100 ? 'Complete' : 
+                                                        percentage === 0 ? 'Paused' : 'In Progress';
+                                  updateConceptRelease(platformIndex, conceptIndex, 'status', suggestedStatus);
+                                }
+                                
+                                updateConceptRelease(platformIndex, conceptIndex, 'rolloutPercentage', percentage);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Status <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              required
+                              value={conceptRelease.status}
+                              onChange={(e) => updateConceptRelease(platformIndex, conceptIndex, 'status', e.target.value as 'In Progress' | 'Complete' | 'Paused' | 'On Hold')}
+                              className={`w-full px-3 py-2 border rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                conceptRelease.status === 'Complete' 
+                                  ? 'bg-green-50 border-green-200 text-green-700'
+                                  : conceptRelease.status === 'Paused'
+                                  ? 'bg-red-50 border-red-200 text-red-700'
+                                  : conceptRelease.status === 'On Hold'
+                                  ? 'bg-orange-50 border-orange-200 text-orange-700'
+                                  : 'bg-yellow-50 border-yellow-200 text-yellow-700'
+                              }`}
+                            >
+                              <option value="In Progress">⏳ In Progress</option>
+                              <option value="Complete">✓ Complete</option>
+                              <option value="Paused">⏸ Paused</option>
+                              <option value="On Hold">🛑 On Hold</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Manual override enabled. Auto-suggests based on rollout %.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Concept Selection */}
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Concepts <span className="text-red-500">*</span>
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {CONCEPTS.map(concept => (
+                              <button
+                                key={concept}
+                                type="button"
+                                onClick={() => toggleConcept(platformIndex, conceptIndex, concept)}
+                                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                                  (conceptRelease.concepts || ['All Concepts']).includes(concept)
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {concept}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Selected: <span className="font-medium">{(conceptRelease.concepts || ['All Concepts']).join(', ')}</span>
+                          </p>
+                        </div>
+
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Release Notes
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={conceptRelease.notes || ''}
+                            onChange={(e) => updateConceptRelease(platformIndex, conceptIndex, 'notes', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Release-specific notes, environment details..."
+                          />
+                        </div>
+
+                        <div className="mt-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Build Link (Optional)
+                          </label>
+                          <input
+                            type="url"
+                            value={conceptRelease.buildLink || ''}
+                            onChange={(e) => updateConceptRelease(platformIndex, conceptIndex, 'buildLink', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="https://sharepoint.com/builds/..."
+                          />
+                        </div>
                       </div>
-                      {/* Hidden select for form compatibility */}
-                      <select
-                        value={platform.status}
-                        onChange={(e) => updatePlatform(index, 'status', e.target.value)}
-                        className="hidden"
-                      >
-                        <option value="In Progress">In Progress</option>
-                        <option value="Complete">Complete</option>
-                        <option value="Paused">Paused</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Concept Selection */}
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Concepts
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {CONCEPTS.map(concept => (
-                        <button
-                          key={concept}
-                          type="button"
-                          onClick={() => toggleConcept(index, concept)}
-                          className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                            (platform.concepts || ['All Concepts']).includes(concept)
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          {concept}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Selected: {(platform.concepts || ['All Concepts']).join(', ')}
-                    </p>
-                  </div>
-
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Platform Notes
-                    </label>
-                    <textarea
-                      rows={2}
-                      type="text"
-                      value={platform.notes || ''}
-                      onChange={(e) => updatePlatform(index, 'notes', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Platform-specific notes, build links, environment details..."
-                    />
-                  </div>
-
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Build Link (Optional)
-                    </label>
-                    <input
-                      type="url"
-                      value={platform.buildLink || ''}
-                      onChange={(e) => updatePlatform(index, 'buildLink', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="https://sharepoint.com/builds/..."
-                    />
+                    ))}
                   </div>
                 </div>
               ))}
@@ -448,7 +588,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
             />
           </div>
 
-          <div className="flex justify-end space-x-3 pt-6 border-t">
+          <div className="flex justify-end space-x-3 pt-6 border-t sticky bottom-0 bg-white">
             <button
               type="button"
               onClick={onClose}
