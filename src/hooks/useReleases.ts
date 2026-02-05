@@ -8,40 +8,35 @@ export const useReleases = () => {
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadReleases = async () => {
-      try {
-        const loadedReleases = await firebaseReleases.getReleases();
-        if (loadedReleases.length === 0) {
-          setReleases(mockReleases);
-          for (const mockRelease of mockReleases) {
-            const { id, ...releaseData } = mockRelease;
-            await firebaseReleases.addRelease(releaseData);
-          }
-        } else {
-          setReleases(loadedReleases);
-        }
-      } catch (error) {
-        console.error('Error loading releases:', error);
+  const loadReleases = async () => {
+    try {
+      const loadedReleases = await firebaseReleases.getReleases();
+      if (loadedReleases.length === 0) {
         setReleases(mockReleases);
-      } finally {
-        setLoading(false);
+        for (const mockRelease of mockReleases) {
+          const { id, ...releaseData } = mockRelease;
+          await firebaseReleases.addRelease(releaseData);
+        }
+      } else {
+        setReleases(loadedReleases);
       }
-    };
+    } catch (error) {
+      console.error('Error loading releases:', error);
+      setReleases(mockReleases);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadReleases();
   }, []);
 
   const addRelease = async (release: Omit<Release, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const id = await firebaseReleases.addRelease(release);
-      const newRelease: Release = {
-        ...release,
-        id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setReleases([newRelease, ...releases]);
+      await firebaseReleases.addRelease(release);
+      // Reload all releases from Firebase to get the complete data
+      await loadReleases();
     } catch (error) {
       console.error('Error adding release:', error);
     }
@@ -50,12 +45,8 @@ export const useReleases = () => {
   const updateRelease = async (id: string, updates: Partial<Release>) => {
     try {
       await firebaseReleases.updateRelease(id, updates as Omit<Release, 'id'>);
-      const updatedReleases = releases.map(release =>
-        release.id === id
-          ? { ...release, ...updates, updatedAt: new Date().toISOString() }
-          : release
-      );
-      setReleases(updatedReleases);
+      // Reload all releases from Firebase to get the updated rollout history
+      await loadReleases();
     } catch (error) {
       console.error('Error updating release:', error);
     }
@@ -64,11 +55,34 @@ export const useReleases = () => {
   const deleteRelease = async (id: string) => {
     try {
       await firebaseReleases.deleteRelease(id);
-      const updatedReleases = releases.filter(release => release.id !== id);
-      setReleases(updatedReleases);
+      // Reload all releases from Firebase
+      await loadReleases();
     } catch (error) {
       console.error('Error deleting release:', error);
     }
+  };
+
+  // Helper function to import from JSON file
+  const importFromJSON = async (file: File): Promise<Release[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const data = JSON.parse(content);
+          // Validate that it's an array of releases
+          if (Array.isArray(data)) {
+            resolve(data as Release[]);
+          } else {
+            reject(new Error('Invalid JSON format: expected an array of releases'));
+          }
+        } catch (error) {
+          reject(new Error('Failed to parse JSON file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
   };
 
   const importReleases = async (file: File) => {
@@ -78,7 +92,8 @@ export const useReleases = () => {
         const { id, ...releaseData } = release;
         await firebaseReleases.addRelease(releaseData);
       }
-      setReleases(importedReleases);
+      // Reload all releases from Firebase
+      await loadReleases();
       return { success: true, message: `Successfully imported ${importedReleases.length} releases` };
     } catch (error) {
       return { success: false, message: error instanceof Error ? error.message : 'Import failed' };
@@ -95,11 +110,17 @@ export const useReleases = () => {
 
   const getStats = (): ReleaseStats => {
     const allPlatforms = releases.flatMap(r => Array.isArray(r.platforms) ? r.platforms : []);
+    
+    // Get all concept releases from all platforms
+    const allConceptReleases = allPlatforms.flatMap(p => 
+      p.conceptReleases && Array.isArray(p.conceptReleases) ? p.conceptReleases : []
+    );
+    
     return {
       totalReleases: releases.length,
-      activeReleases: allPlatforms.filter(p => p && p.status === 'In Progress').length,
-      completedReleases: allPlatforms.filter(p => p && p.status === 'Complete').length,
-      pausedReleases: allPlatforms.filter(p => p && p.status === 'Paused').length,
+      activeReleases: allConceptReleases.filter(cr => cr && cr.status === 'In Progress').length,
+      completedReleases: allConceptReleases.filter(cr => cr && cr.status === 'Complete').length,
+      pausedReleases: allConceptReleases.filter(cr => cr && (cr.status === 'On Hold' || cr.status === 'Paused')).length,
     };
   };
 
@@ -111,7 +132,15 @@ export const useReleases = () => {
       }
       
       if (filters.status && filters.status !== 'All') {
-        const hasStatus = release.platforms.some(p => p.status === filters.status);
+        // Check both conceptReleases and legacy platform status
+        const hasStatus = release.platforms.some(p => {
+          // Check concept releases
+          if (p.conceptReleases && Array.isArray(p.conceptReleases)) {
+            return p.conceptReleases.some(cr => cr.status === filters.status);
+          }
+          // Fallback to legacy platform status
+          return p.status === filters.status;
+        });
         if (!hasStatus) return false;
       }
       if (filters.dateRange?.start && new Date(release.releaseDate) < new Date(filters.dateRange.start)) {
