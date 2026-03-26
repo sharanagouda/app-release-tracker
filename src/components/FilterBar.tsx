@@ -128,14 +128,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               <span className="sm:hidden">CSV</span>
             </button>
             
-            <button
+            {/* <button
               onClick={onExportJSON}
               className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-150 text-sm flex-1 sm:flex-initial"
             >
               <Download className="h-4 w-4" />
               <span className="hidden sm:inline">JSON</span>
               <span className="sm:hidden">JSON</span>
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

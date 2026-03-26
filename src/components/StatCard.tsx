@@ -7,33 +7,44 @@ interface StatCardProps {
   icon: LucideIcon;
   color: 'blue' | 'yellow' | 'green' | 'red';
   darkMode?: boolean;
+  isActive?: boolean;
+  onClick?: () => void;
   trend?: {
     value: number;
     isPositive: boolean;
   };
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ 
-  title, 
-  value, 
-  icon: Icon, 
+export const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  icon: Icon,
   color,
   darkMode = false,
-  trend 
+  isActive = false,
+  onClick,
+  trend
 }) => {
   const colorClasses = {
-    blue: darkMode 
-      ? 'bg-blue-900/20 border-blue-800/50 text-blue-300' 
+    blue: darkMode
+      ? 'bg-blue-900/20 border-blue-800/50 text-blue-300'
       : 'bg-blue-50 border-blue-200 text-blue-700',
-    yellow: darkMode 
-      ? 'bg-yellow-900/20 border-yellow-800/50 text-yellow-300' 
+    yellow: darkMode
+      ? 'bg-yellow-900/20 border-yellow-800/50 text-yellow-300'
       : 'bg-yellow-50 border-yellow-200 text-yellow-700',
-    green: darkMode 
-      ? 'bg-green-900/20 border-green-800/50 text-green-300' 
+    green: darkMode
+      ? 'bg-green-900/20 border-green-800/50 text-green-300'
       : 'bg-green-50 border-green-200 text-green-700',
-    red: darkMode 
-      ? 'bg-red-900/20 border-red-800/50 text-red-300' 
+    red: darkMode
+      ? 'bg-red-900/20 border-red-800/50 text-red-300'
       : 'bg-red-50 border-red-200 text-red-700',
+  };
+
+  const activeRingClasses = {
+    blue: 'ring-2 ring-blue-500 ring-offset-2',
+    yellow: 'ring-2 ring-yellow-500 ring-offset-2',
+    green: 'ring-2 ring-green-500 ring-offset-2',
+    red: 'ring-2 ring-red-500 ring-offset-2',
   };
 
   const iconColorClasses = {
@@ -44,7 +55,10 @@ export const StatCard: React.FC<StatCardProps> = ({
   };
 
   return (
-    <div className={`rounded-lg border-2 p-4 sm:p-6 transition-all duration-200 hover:shadow-lg ${colorClasses[color]}`}>
+    <div
+      onClick={onClick}
+      className={`rounded-lg border-2 p-4 sm:p-6 transition-all duration-200 hover:shadow-lg ${colorClasses[color]} ${isActive ? activeRingClasses[color] : ''} ${onClick ? 'cursor-pointer' : ''}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-xs sm:text-sm font-medium opacity-75 truncate">{title}</p>

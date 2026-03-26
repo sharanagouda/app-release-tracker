@@ -130,8 +130,13 @@ function App() {
     
     const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
     const matchesEnvironment = !filters.environment || filters.environment === 'All' || environment === filters.environment;
+
+    // Date range filter — compare date strings directly (YYYY-MM-DD) to avoid timezone issues
+    const releaseDate = release.releaseDate ? release.releaseDate.substring(0, 10) : '';
+    const matchesDateStart = !filters.dateRange?.start || releaseDate >= filters.dateRange.start;
+    const matchesDateEnd = !filters.dateRange?.end || releaseDate <= filters.dateRange.end;
     
-    return matchesSearch && matchesStatus && matchesEnvironment;
+    return matchesSearch && matchesStatus && matchesEnvironment && matchesDateStart && matchesDateEnd;
   }).sort((a, b) => {
     // Apply sorting
     switch (filters.sortBy) {
@@ -320,6 +325,8 @@ function App() {
             icon={ExternalLink}
             color="blue"
             darkMode={darkMode}
+            isActive={!filters.status || filters.status === 'All'}
+            onClick={() => setFilters(prev => ({ ...prev, status: 'All', dateRange: { start: '', end: '' } }))}
           />
           <StatCard
             title="In Progress"
@@ -327,6 +334,8 @@ function App() {
             icon={Download}
             color="yellow"
             darkMode={darkMode}
+            isActive={filters.status === 'In Progress'}
+            onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'In Progress' ? 'All' : 'In Progress', dateRange: { start: '', end: '' } }))}
           />
           <StatCard
             title="Completed"
@@ -334,6 +343,8 @@ function App() {
             icon={Download}
             color="green"
             darkMode={darkMode}
+            isActive={filters.status === 'Complete'}
+            onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'Complete' ? 'All' : 'Complete', dateRange: { start: '', end: '' } }))}
           />
           <StatCard
             title="Paused"
@@ -341,15 +352,57 @@ function App() {
             icon={Download}
             color="red"
             darkMode={darkMode}
+            isActive={filters.status === 'Paused'}
+            onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'Paused' ? 'All' : 'Paused', dateRange: { start: '', end: '' } }))}
           />
         </div>
 
         {/* Controls */}
         <FilterBar
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={(newFilters) => {
+            const dateChanged =
+              newFilters.dateRange?.start !== filters.dateRange?.start ||
+              newFilters.dateRange?.end !== filters.dateRange?.end;
+
+            const sortByChanged = newFilters.sortBy !== filters.sortBy;
+
+            // Map sort dropdown values to status filter values
+            const sortStatusMap: Record<string, string> = {
+              completed: 'Complete',
+              inProgress: 'In Progress',
+              paused: 'Paused',
+            };
+
+            if (dateChanged) {
+              // Date range selected → reset status to All, keep sort
+              setFilters({ ...newFilters, status: 'All' });
+            } else if (sortByChanged && newFilters.sortBy && sortStatusMap[newFilters.sortBy]) {
+              // Status-based sort selected → apply status filter + clear date range
+              setFilters({
+                ...newFilters,
+                status: sortStatusMap[newFilters.sortBy],
+                dateRange: { start: '', end: '' },
+              });
+            } else if (sortByChanged) {
+              // Date/time sort selected (releaseDate, lastUpdate) → clear status + date range
+              setFilters({
+                ...newFilters,
+                status: 'All',
+                dateRange: { start: '', end: '' },
+              });
+            } else {
+              setFilters(newFilters);
+            }
+          }}
           searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          onSearchChange={(term) => {
+            // When searching, clear date range so search works across all data
+            if (term && (filters.dateRange?.start || filters.dateRange?.end)) {
+              setFilters(prev => ({ ...prev, dateRange: { start: '', end: '' }, status: 'All' }));
+            }
+            setSearchTerm(term);
+          }}
           onExportCSV={exportToCSV}
           onExportJSON={exportToJSON}
           darkMode={darkMode}

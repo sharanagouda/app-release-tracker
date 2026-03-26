@@ -34,9 +34,13 @@ export const useReleases = () => {
 
   const addRelease = async (release: Omit<Release, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      await firebaseReleases.addRelease(release);
-      // Reload all releases from Firebase to get the complete data
-      await loadReleases();
+      const newId = await firebaseReleases.addRelease(release as Omit<Release, 'id'>);
+      // Fetch the newly created release from Firebase to get server-generated fields
+      const newRelease = await firebaseReleases.getRelease(newId);
+      if (newRelease) {
+        // Prepend to local state — no full reload needed
+        setReleases(prev => [newRelease, ...prev]);
+      }
     } catch (error) {
       console.error('Error adding release:', error);
     }
@@ -45,8 +49,12 @@ export const useReleases = () => {
   const updateRelease = async (id: string, updates: Partial<Release>) => {
     try {
       await firebaseReleases.updateRelease(id, updates as Omit<Release, 'id'>);
-      // Reload all releases from Firebase to get the updated rollout history
-      await loadReleases();
+      // Fetch the updated release from Firebase to get the latest rollout history
+      const updatedRelease = await firebaseReleases.getRelease(id);
+      if (updatedRelease) {
+        // Replace the existing item by id — no full reload, no duplicates
+        setReleases(prev => prev.map(r => r.id === id ? updatedRelease : r));
+      }
     } catch (error) {
       console.error('Error updating release:', error);
     }
@@ -55,8 +63,8 @@ export const useReleases = () => {
   const deleteRelease = async (id: string) => {
     try {
       await firebaseReleases.deleteRelease(id);
-      // Reload all releases from Firebase
-      await loadReleases();
+      // Remove the item by id from local state — no full reload needed
+      setReleases(prev => prev.filter(r => r.id !== id));
     } catch (error) {
       console.error('Error deleting release:', error);
     }
