@@ -12,6 +12,70 @@ const safeStringify = (value: any): string => {
 };
 
 /**
+ * Common download function
+ */
+const downloadFile = (content: string, mimeType: string, extension: string): void => {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = `export_${new Date().toISOString().split('T')[0]}.${extension}`;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+};
+
+/**
+ * Export release notes to CSV with dynamic columns
+ */
+export const exportReleaseNotesToCSV = (notes: any[], columns: { id: string; label: string }[]): void => {
+  if (!notes || notes.length === 0) {
+    alert('No data to export');
+    return;
+  }
+
+  try {
+    const rows: string[][] = [];
+
+    // Add headers
+    const headers = columns.map(col => col.label);
+    rows.push(headers);
+
+    // Process each note
+    for (let i = 0; i < notes.length; i++) {
+      const note = notes[i];
+      const row: string[] = [];
+
+      for (let j = 0; j < columns.length; j++) {
+        const colId = columns[j].id;
+        row.push(safeStringify(note[colId]));
+      }
+
+      rows.push(row);
+    }
+
+    // Convert to CSV string
+    const csvContent = rows.map(row =>
+      row.map(cell => {
+        // Escape quotes and wrap in quotes
+        const escaped = cell.replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(',')
+    ).join('\n');
+
+    // Download the file
+    downloadFile(csvContent, 'text/csv', 'csv');
+  } catch (error) {
+    console.error('CSV Export Error:', error);
+    alert('Error exporting to CSV. Check console for details.');
+  }
+};
+
+/**
  * Export releases to CSV format
  */
 export const exportToCSVFunction = (releases: Release[]): void => {
@@ -22,7 +86,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
 
   try {
     const rows: string[][] = [];
-    
+
     // Add headers
     const headers = [
       'Release ID',
@@ -49,11 +113,11 @@ export const exportToCSVFunction = (releases: Release[]): void => {
     for (let i = 0; i < releases.length; i++) {
       const release = releases[i];
       const platforms = release.platforms || [];
-      
+
       for (let j = 0; j < platforms.length; j++) {
         const platform = platforms[j];
         const conceptReleases = platform.conceptReleases || [];
-        
+
         if (conceptReleases.length > 0) {
           // New structure with conceptReleases
           for (let k = 0; k < conceptReleases.length; k++) {
@@ -104,7 +168,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
     }
 
     // Convert to CSV string
-    const csvContent = rows.map(row => 
+    const csvContent = rows.map(row =>
       row.map(cell => {
         // Escape quotes and wrap in quotes
         const escaped = cell.replace(/"/g, '""');
@@ -121,98 +185,12 @@ export const exportToCSVFunction = (releases: Release[]): void => {
 };
 
 /**
- * Export releases to JSON format
- */
-export const exportToJSONFunction = (releases: Release[]): void => {
-  if (!releases || releases.length === 0) {
-    alert('No releases to export');
-    return;
-  }
-
-  try {
-    // Build clean JSON structure manually
-    const cleanData: any[] = [];
-    
-    for (let i = 0; i < releases.length; i++) {
-      const release = releases[i];
-      const platforms = release.platforms || [];
-      
-      const cleanPlatforms: any[] = [];
-      for (let j = 0; j < platforms.length; j++) {
-        const platform = platforms[j];
-        const conceptReleases = platform.conceptReleases || [];
-        
-        const cleanConceptReleases: any[] = [];
-        for (let k = 0; k < conceptReleases.length; k++) {
-          const cr = conceptReleases[k];
-          const rolloutHistory = cr.rolloutHistory || [];
-          
-          const cleanRolloutHistory: any[] = [];
-          for (let m = 0; m < rolloutHistory.length; m++) {
-            const rh = rolloutHistory[m];
-            cleanRolloutHistory.push({
-              percentage: rh.percentage || 0,
-              date: rh.date || '',
-              notes: rh.notes || ''
-            });
-          }
-          
-          cleanConceptReleases.push({
-            id: cr.id || '',
-            concepts: Array.isArray(cr.concepts) ? cr.concepts : [],
-            version: cr.version || '',
-            buildId: cr.buildId || '',
-            rolloutPercentage: cr.rolloutPercentage || 0,
-            status: cr.status || '',
-            notes: cr.notes || '',
-            buildLink: cr.buildLink || '',
-            rolloutHistory: cleanRolloutHistory
-          });
-        }
-        
-        cleanPlatforms.push({
-          platform: platform.platform || '',
-          conceptReleases: cleanConceptReleases
-        });
-      }
-      
-      const changes = release.changes || [];
-      const cleanChanges: string[] = [];
-      for (let j = 0; j < changes.length; j++) {
-        cleanChanges.push(String(changes[j]));
-      }
-      
-      cleanData.push({
-        id: release.id || '',
-        releaseDate: release.releaseDate || '',
-        releaseName: release.releaseName || '',
-        environment: release.environment || '',
-        platforms: cleanPlatforms,
-        changes: cleanChanges,
-        notes: release.notes || '',
-        createdAt: release.createdAt || '',
-        updatedAt: release.updatedAt || ''
-      });
-    }
-
-    // Manually build JSON string to avoid any circular reference issues
-    const jsonString = buildJSONString(cleanData);
-    
-    // Download the file
-    downloadFile(jsonString, 'application/json', 'json');
-  } catch (error) {
-    console.error('JSON Export Error:', error);
-    alert('Error exporting to JSON. Check console for details.');
-  }
-};
-
-/**
  * Manually build JSON string to avoid circular references
  */
 const buildJSONString = (data: any[]): string => {
   const indent = '  ';
   let result = '[\n';
-  
+
   for (let i = 0; i < data.length; i++) {
     const item = data[i];
     result += indent + '{\n';
@@ -220,14 +198,14 @@ const buildJSONString = (data: any[]): string => {
     result += indent + indent + `"releaseDate": "${item.releaseDate}",\n`;
     result += indent + indent + `"releaseName": "${item.releaseName}",\n`;
     result += indent + indent + `"environment": "${item.environment}",\n`;
-    
+
     // Platforms
     result += indent + indent + '"platforms": [\n';
     for (let j = 0; j < item.platforms.length; j++) {
       const platform = item.platforms[j];
       result += indent + indent + indent + '{\n';
       result += indent + indent + indent + indent + `"platform": "${platform.platform}",\n`;
-      
+
       // Concept Releases
       result += indent + indent + indent + indent + '"conceptReleases": [\n';
       for (let k = 0; k < platform.conceptReleases.length; k++) {
@@ -252,7 +230,7 @@ const buildJSONString = (data: any[]): string => {
       result += '\n';
     }
     result += indent + indent + '],\n';
-    
+
     // Changes
     result += indent + indent + `"changes": [${item.changes.map((c: string) => `"${c}"`).join(', ')}],\n`;
     result += indent + indent + `"notes": "${item.notes}",\n`;
@@ -262,27 +240,95 @@ const buildJSONString = (data: any[]): string => {
     if (i < data.length - 1) result += ',';
     result += '\n';
   }
-  
+
   result += ']';
   return result;
 };
 
 /**
- * Common download function
+ * Export releases to JSON format
  */
-const downloadFile = (content: string, mimeType: string, extension: string): void => {
-  const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  
-  link.href = url;
-  link.download = `releases_export_${new Date().toISOString().split('T')[0]}.${extension}`;
-  
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  setTimeout(() => URL.revokeObjectURL(url), 100);
+export const exportToJSONFunction = (releases: Release[]): void => {
+  if (!releases || releases.length === 0) {
+    alert('No releases to export');
+    return;
+  }
+
+  try {
+    // Build clean JSON structure manually
+    const cleanData: any[] = [];
+
+    for (let i = 0; i < releases.length; i++) {
+      const release = releases[i];
+      const platforms = release.platforms || [];
+
+      const cleanPlatforms: any[] = [];
+      for (let j = 0; j < platforms.length; j++) {
+        const platform = platforms[j];
+        const conceptReleases = platform.conceptReleases || [];
+
+        const cleanConceptReleases: any[] = [];
+        for (let k = 0; k < conceptReleases.length; k++) {
+          const cr = conceptReleases[k];
+          const rolloutHistory = cr.rolloutHistory || [];
+
+          const cleanRolloutHistory: any[] = [];
+          for (let m = 0; m < rolloutHistory.length; m++) {
+            const rh = rolloutHistory[m];
+            cleanRolloutHistory.push({
+              percentage: rh.percentage || 0,
+              date: rh.date || '',
+              notes: rh.notes || ''
+            });
+          }
+
+          cleanConceptReleases.push({
+            id: cr.id || '',
+            concepts: Array.isArray(cr.concepts) ? cr.concepts : [],
+            version: cr.version || '',
+            buildId: cr.buildId || '',
+            rolloutPercentage: cr.rolloutPercentage || 0,
+            status: cr.status || '',
+            notes: cr.notes || '',
+            buildLink: cr.buildLink || '',
+            rolloutHistory: cleanRolloutHistory
+          });
+        }
+
+        cleanPlatforms.push({
+          platform: platform.platform || '',
+          conceptReleases: cleanConceptReleases
+        });
+      }
+
+      const changes = release.changes || [];
+      const cleanChanges: string[] = [];
+      for (let j = 0; j < changes.length; j++) {
+        cleanChanges.push(String(changes[j]));
+      }
+
+      cleanData.push({
+        id: release.id || '',
+        releaseDate: release.releaseDate || '',
+        releaseName: release.releaseName || '',
+        environment: release.environment || '',
+        platforms: cleanPlatforms,
+        changes: cleanChanges,
+        notes: release.notes || '',
+        createdAt: release.createdAt || '',
+        updatedAt: release.updatedAt || ''
+      });
+    }
+
+    // Manually build JSON string to avoid any circular reference issues
+    const jsonString = buildJSONString(cleanData);
+
+    // Download the file
+    downloadFile(jsonString, 'application/json', 'json');
+  } catch (error) {
+    console.error('JSON Export Error:', error);
+    alert('Error exporting to JSON. Check console for details.');
+  }
 };
 
 /**
@@ -300,11 +346,11 @@ export const exportFilteredToCSV = (
 ): void => {
   try {
     const filtered: Release[] = [];
-    
+
     for (let i = 0; i < releases.length; i++) {
       const release = releases[i];
       let include = true;
-      
+
       // Platform filter
       if (filters.platform && filters.platform !== 'All Platforms') {
         const platforms = release.platforms || [];
@@ -317,12 +363,12 @@ export const exportFilteredToCSV = (
         }
         if (!hasPlatform) include = false;
       }
-      
+
       // Environment filter
       if (include && filters.environment && filters.environment !== 'All') {
         if (release.environment !== filters.environment) include = false;
       }
-      
+
       // Concept filter
       if (include && filters.concept && filters.concept !== 'All Concepts') {
         const platforms = release.platforms || [];
@@ -343,7 +389,7 @@ export const exportFilteredToCSV = (
         }
         if (!hasConcept) include = false;
       }
-      
+
       // Status filter
       if (include && filters.status && filters.status !== 'All') {
         const platforms = release.platforms || [];
@@ -360,23 +406,23 @@ export const exportFilteredToCSV = (
         }
         if (!hasStatus) include = false;
       }
-      
+
       // Search query
       if (include && filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           (release.releaseName || '').toLowerCase().includes(query) ||
           (release.releaseDate || '').includes(query) ||
           (release.notes || '').toLowerCase().includes(query);
         if (!matchesSearch) include = false;
       }
-      
+
       if (include) {
         filtered.push(release);
       }
     }
-    
-    exportToCSV(filtered);
+
+    exportToCSVFunction(filtered);
   } catch (error) {
     console.error('Filtered CSV Export Error:', error);
     alert('Error exporting filtered data to CSV.');
@@ -398,11 +444,11 @@ export const exportFilteredToJSON = (
 ): void => {
   try {
     const filtered: Release[] = [];
-    
+
     for (let i = 0; i < releases.length; i++) {
       const release = releases[i];
       let include = true;
-      
+
       // Platform filter
       if (filters.platform && filters.platform !== 'All Platforms') {
         const platforms = release.platforms || [];
@@ -415,12 +461,12 @@ export const exportFilteredToJSON = (
         }
         if (!hasPlatform) include = false;
       }
-      
+
       // Environment filter
       if (include && filters.environment && filters.environment !== 'All') {
         if (release.environment !== filters.environment) include = false;
       }
-      
+
       // Concept filter
       if (include && filters.concept && filters.concept !== 'All Concepts') {
         const platforms = release.platforms || [];
@@ -441,7 +487,7 @@ export const exportFilteredToJSON = (
         }
         if (!hasConcept) include = false;
       }
-      
+
       // Status filter
       if (include && filters.status && filters.status !== 'All') {
         const platforms = release.platforms || [];
@@ -458,23 +504,23 @@ export const exportFilteredToJSON = (
         }
         if (!hasStatus) include = false;
       }
-      
+
       // Search query
       if (include && filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           (release.releaseName || '').toLowerCase().includes(query) ||
           (release.releaseDate || '').includes(query) ||
           (release.notes || '').toLowerCase().includes(query);
         if (!matchesSearch) include = false;
       }
-      
+
       if (include) {
         filtered.push(release);
       }
     }
-    
-    exportToJSON(filtered);
+
+    exportToJSONFunction(filtered);
   } catch (error) {
     console.error('Filtered JSON Export Error:', error);
     alert('Error exporting filtered data to JSON.');
