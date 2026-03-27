@@ -8,6 +8,7 @@ interface StatCardProps {
   color: 'blue' | 'yellow' | 'green' | 'red';
   darkMode?: boolean;
   isActive?: boolean;
+  loading?: boolean;
   onClick?: () => void;
   trend?: {
     value: number;
@@ -22,6 +23,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   color,
   darkMode = false,
   isActive = false,
+  loading = false,
   onClick,
   trend
 }) => {
@@ -54,6 +56,22 @@ export const StatCard: React.FC<StatCardProps> = ({
     red: darkMode ? 'text-red-400' : 'text-red-600',
   };
 
+  if (loading) {
+    return (
+      <div className={`rounded-lg border-2 p-4 sm:p-6 animate-pulse ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'
+      }`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className={`h-3 w-20 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+            <div className={`h-7 w-12 rounded mt-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+          </div>
+          <div className={`h-8 w-8 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       onClick={onClick}
@@ -66,7 +84,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           {trend && (
             <div className="flex flex-wrap items-center mt-1 sm:mt-2 gap-1">
               <span className={`text-xs font-medium ${
-                trend.isPositive 
+                trend.isPositive
                   ? darkMode ? 'text-green-400' : 'text-green-600'
                   : darkMode ? 'text-red-400' : 'text-red-600'
               }`}>

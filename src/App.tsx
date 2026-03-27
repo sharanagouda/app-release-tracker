@@ -15,7 +15,7 @@ import { onAuthChange, logout } from './services/firebaseAuth';
 import { User } from 'firebase/auth';
 
 function App() {
-  const { releases, addRelease, updateRelease, deleteRelease } = useReleases();
+  const { releases, loading, saving, saveError, addRelease, updateRelease, deleteRelease } = useReleases();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -215,7 +215,10 @@ function App() {
       setIsModalOpen(false);
       setEditingRelease(null);
     } catch (error) {
-      console.error('Error saving release:', error);
+      // Error is already stored in saveError state from the hook
+      // Show alert for duplicate or other errors
+      const message = error instanceof Error ? error.message : 'Error saving release';
+      alert(message);
     }
   };
 
@@ -325,6 +328,7 @@ function App() {
             icon={ExternalLink}
             color="blue"
             darkMode={darkMode}
+            loading={loading}
             isActive={!filters.status || filters.status === 'All'}
             onClick={() => setFilters(prev => ({ ...prev, status: 'All', dateRange: { start: '', end: '' } }))}
           />
@@ -334,6 +338,7 @@ function App() {
             icon={Download}
             color="yellow"
             darkMode={darkMode}
+            loading={loading}
             isActive={filters.status === 'In Progress'}
             onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'In Progress' ? 'All' : 'In Progress', dateRange: { start: '', end: '' } }))}
           />
@@ -343,6 +348,7 @@ function App() {
             icon={Download}
             color="green"
             darkMode={darkMode}
+            loading={loading}
             isActive={filters.status === 'Complete'}
             onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'Complete' ? 'All' : 'Complete', dateRange: { start: '', end: '' } }))}
           />
@@ -352,6 +358,7 @@ function App() {
             icon={Download}
             color="red"
             darkMode={darkMode}
+            loading={loading}
             isActive={filters.status === 'Paused'}
             onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'Paused' ? 'All' : 'Paused', dateRange: { start: '', end: '' } }))}
           />
@@ -418,7 +425,63 @@ function App() {
           </button>
         </div>
 
+        {/* Loading Skeleton */}
+        {loading && (
+          <>
+            {/* Desktop Table Skeleton */}
+            <div className="hidden lg:block">
+              <div className={`rounded-lg border shadow-sm overflow-hidden ${
+                darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+              }`}>
+                {/* Table header skeleton */}
+                <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+                  <div className="flex gap-6">
+                    {[80, 120, 100, 80, 60, 80].map((w, i) => (
+                      <div key={i} className={`h-3 rounded animate-pulse ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} style={{ width: w }} />
+                    ))}
+                  </div>
+                </div>
+                {/* Table rows skeleton */}
+                {[1, 2, 3, 4, 5].map((row) => (
+                  <div key={row} className={`px-4 py-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <div className="flex items-center gap-6 animate-pulse">
+                      <div className={`h-4 w-24 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div className={`h-4 w-32 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div className={`h-4 w-20 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div className={`h-4 w-16 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div className={`h-6 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div className={`h-4 w-20 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Mobile Card Skeleton */}
+            <div className="lg:hidden space-y-4">
+              {[1, 2, 3].map((card) => (
+                <div key={card} className={`rounded-lg border p-4 animate-pulse ${
+                  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className={`h-5 w-40 rounded mb-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                      <div className={`h-3 w-24 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+                    </div>
+                    <div className={`h-6 w-20 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                  </div>
+                  <div className="flex gap-3 mt-3">
+                    <div className={`h-4 w-16 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                    <div className={`h-4 w-16 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                    <div className={`h-4 w-16 rounded ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         {/* Desktop Table View */}
+        {!loading && (
         <div className="hidden lg:block">
           <ReleaseTable
             releases={filteredReleases}
@@ -430,8 +493,10 @@ function App() {
             darkMode={darkMode}
           />
         </div>
+        )}
 
         {/* Mobile Card View */}
+        {!loading && (
         <div className="lg:hidden space-y-4">
           {filteredReleases.map((release) => {
             const overallStatus = getOverallStatus(release);
@@ -538,8 +603,9 @@ function App() {
             );
           })}
         </div>
+        )}
 
-        {filteredReleases.length === 0 && (
+        {!loading && filteredReleases.length === 0 && (
           <div className="text-center py-12">
             <div className={darkMode ? 'text-gray-600' : 'text-gray-400'}>
               <Filter className="w-12 h-12 mx-auto mb-4" />

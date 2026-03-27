@@ -242,7 +242,7 @@ useEffect(() => {
       changes: filteredChanges,
       updatedAt: new Date().toISOString(),
     });
-    onClose();
+    // Note: Modal closing is handled by the parent (App.tsx) after successful save
   };
 
   const addConceptRelease = (platformIndex: number) => {
@@ -774,24 +774,17 @@ useEffect(() => {
                                   const percentage = value === '' ? 0 : Number(value);
                                   const currentPercentage = conceptRelease.rolloutPercentage;
                                   
-                                  // Add to rollout history if percentage changed
+                                  // Update percentage value
+                                  updateConceptRelease(platformIndex, conceptIndex, 'rolloutPercentage', percentage);
+                                  
+                                  // Auto-suggest status based on percentage (user can still override)
                                   if (percentage !== currentPercentage) {
-                                    const newHistoryEntry = {
-                                      percentage: percentage,
-                                      date: new Date().toISOString(),
-                                      notes: `Updated from ${currentPercentage}% to ${percentage}%`
-                                    };
-                                    
-                                    const updatedHistory = [...(conceptRelease.rolloutHistory || []), newHistoryEntry];
-                                    updateConceptRelease(platformIndex, conceptIndex, 'rolloutHistory', updatedHistory);
-                                    
-                                    // Auto-suggest status based on percentage (user can still override)
-                                    const suggestedStatus = percentage === 100 ? 'Complete' : 
+                                    const suggestedStatus = percentage === 100 ? 'Complete' :
                                                           percentage === 0 ? 'Not Started' : 'In Progress';
                                     updateConceptRelease(platformIndex, conceptIndex, 'status', suggestedStatus);
                                   }
-                                  
-                                  updateConceptRelease(platformIndex, conceptIndex, 'rolloutPercentage', percentage);
+                                  // Note: Rollout history is tracked server-side in firebaseReleases.updateRelease()
+                                  // when the form is saved, not on every keystroke
                                 }}
                                 onKeyDown={(e) => {
                                   // Allow backspace/delete to clear the field

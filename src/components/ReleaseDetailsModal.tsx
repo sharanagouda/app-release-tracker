@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Calendar, Package, FileText, Clock, ListChecks } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar, Package, FileText, Clock, ListChecks, Mail, Share2, Copy, Check } from 'lucide-react';
 import { Release, PlatformRelease, ConceptRelease } from '../types/release';
 
 interface ReleaseDetailsModalProps {
@@ -63,6 +63,64 @@ const getConceptReleases = (platform: PlatformRelease): ConceptRelease[] => {
   }];
 };
 
+// Generate a plain-text email body from a release
+const generateEmailContent = (release: Release): { subject: string; body: string } => {
+  const releaseDate = new Date(release.releaseDate).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const subject = `Release Update: ${release.releaseName} — ${releaseDate}`;
+
+  let body = `Release: ${release.releaseName}\n`;
+  body += `Date: ${releaseDate}\n`;
+  body += `Environment: ${release.environment || release.concept || 'N/A'}\n`;
+  body += `\n${'─'.repeat(50)}\n\n`;
+
+  // Platform details
+  body += `PLATFORM DETAILS\n${'─'.repeat(50)}\n\n`;
+  release.platforms.forEach((platform) => {
+    const conceptReleases = getConceptReleases(platform);
+    body += `▸ ${platform.platform}\n`;
+    conceptReleases.forEach((cr) => {
+      const concepts = cr.concepts?.join(', ') || 'All Concepts';
+      body += `  Concepts: ${concepts}\n`;
+      body += `  Version: ${cr.version || 'N/A'}  |  Build: ${cr.buildId || 'N/A'}\n`;
+      body += `  Rollout: ${cr.rolloutPercentage}%  |  Status: ${cr.status}\n`;
+      if (cr.buildLink) body += `  Build Link: ${cr.buildLink}\n`;
+      if (cr.notes) body += `  Notes: ${cr.notes}\n`;
+      if (cr.versionChanges && cr.versionChanges.length > 0) {
+        body += `  What's New:\n`;
+        cr.versionChanges.forEach((vc) => {
+          body += `    • ${vc}\n`;
+        });
+      }
+      body += `\n`;
+    });
+  });
+
+  // Changes
+  if (release.changes && release.changes.length > 0) {
+    body += `CHANGES & UPDATES\n${'─'.repeat(50)}\n`;
+    release.changes.forEach((change) => {
+      body += `  • ${change}\n`;
+    });
+    body += `\n`;
+  }
+
+  // Notes
+  if (release.notes) {
+    body += `RELEASE NOTES\n${'─'.repeat(50)}\n`;
+    body += `${release.notes}\n\n`;
+  }
+
+  body += `${'─'.repeat(50)}\n`;
+  body += `This release update was generated from the App Release Tracker.`;
+
+  return { subject, body };
+};
+
 export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
   isOpen,
   onClose,
@@ -70,7 +128,149 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
   darkMode = false,
   currentUserEmail = 'user@example.com',
 }) => {
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [showTeamsShare, setShowTeamsShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [teamsShared, setTeamsShared] = useState(false);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [teamsMessage, setTeamsMessage] = useState('');
+
+  // Teams groups configuration — add more groups here as needed
+  const teamsGroups = [
+    {
+      id: 'mobile-releases',
+      name: 'Mobile Releases',
+      url: 'https://teams.microsoft.com/l/chat/19:e74fc43b44cc490f9c79707b3a73cbc4@thread.v2/conversations?context=%7B%22contextType%22%3A%22chat%22%7D',
+    },
+     {
+      id: 'Release-group-for-BLC',
+      name: 'Release-group-for-BLC',
+      url: 'https://teams.microsoft.com/l/chat/19:00c1e6a443f4473a9c928734dc53f4e4@thread.v2/conversations?context=%7B%22contextType%22%3A%22chat%22%7D',
+    },
+  ];
+
   if (!isOpen || !release) return null;
+
+  const { subject: emailSubject, body: emailBody } = generateEmailContent(release);
+
+  const generateTeamsMessage = (): string => {
+    const releaseDate = new Date(release.releaseDate).toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'long',
+    }).toUpperCase();
+
+    const env = (release.environment || release.concept || 'Production').toUpperCase();
+
+    let message = `========= ${release.releaseName.toUpperCase()} ${releaseDate} - NATIVE RELEASE STATUS ==========\n\n`;
+    message += `All apps are submitted for review with below details.\n`;
+    message += `Environment: ${env}\n\n`;
+
+    // Group concept releases by concepts for a cleaner format
+    release.platforms.forEach((platform) => {
+      const conceptReleases = getConceptReleases(platform);
+      conceptReleases.forEach((cr) => {
+        const concepts = cr.concepts?.join(', ') || 'All Concepts';
+        message += `${concepts} - ${env}\n`;
+        message += `${platform.platform} - ${cr.version || 'N/A'}${cr.buildId ? ` (${cr.buildId})` : ''}\n`;
+        if (cr.buildLink) {
+          message += `Build Link: ${cr.buildLink}\n`;
+        }
+        message += `\n`;
+      });
+    });
+
+    // Rollout info
+    const rolloutLines: string[] = [];
+    release.platforms.forEach((platform) => {
+      const conceptReleases = getConceptReleases(platform);
+      conceptReleases.forEach((cr) => {
+        if (cr.rolloutPercentage > 0) {
+          rolloutLines.push(`${cr.rolloutPercentage}%(${platform.platform})`);
+        }
+      });
+    });
+    if (rolloutLines.length > 0) {
+      message += `Rollout will start at ${rolloutLines.join(' and ')} after successful review.\n\n`;
+    }
+
+    // Changes
+    if (release.changes && release.changes.length > 0) {
+      message += `Changes:\n`;
+      release.changes.forEach((change) => {
+        message += `• ${change}\n`;
+      });
+      message += `\n`;
+    }
+
+    // Notes
+    if (release.notes) {
+      message += `Notes: ${release.notes}\n`;
+    }
+
+    return message;
+  };
+
+  const handleOpenTeamsShare = () => {
+    setTeamsMessage(generateTeamsMessage());
+    setShowTeamsShare(true);
+  };
+
+  const handleCopyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(`Subject: ${emailSubject}\n\n${emailBody}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = `Subject: ${emailSubject}\n\n${emailBody}`;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleToggleGroup = (groupId: string) => {
+    setSelectedGroups(prev =>
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
+    );
+  };
+
+  const handleShareToSelectedGroups = async () => {
+    if (selectedGroups.length === 0) return;
+
+    // Copy the editable message to clipboard
+    try {
+      await navigator.clipboard.writeText(teamsMessage);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = teamsMessage;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+
+    // Open each selected group in a new tab
+    const groupsToOpen = teamsGroups.filter(g => selectedGroups.includes(g.id));
+    groupsToOpen.forEach((group, index) => {
+      // Stagger opening to avoid popup blockers
+      setTimeout(() => {
+        window.open(group.url, '_blank');
+      }, index * 500);
+    });
+
+    // Show toast and close modal
+    setShowTeamsShare(false);
+    setSelectedGroups([]);
+    setTeamsShared(true);
+    setTimeout(() => setTeamsShared(false), 4000);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
@@ -86,16 +286,43 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
           }`}>
             Release Details
           </h2>
-          <button
-            onClick={onClose}
-            className={`p-1 rounded-lg transition-colors ${
-              darkMode 
-                ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' 
-                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <X className="h-5 w-5 sm:h-6 sm:w-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Email Preview Button */}
+            <button
+              onClick={() => setShowEmailPreview(true)}
+              title="Email preview"
+              className={`p-2 rounded-lg transition-colors ${
+                darkMode
+                  ? 'text-gray-400 hover:text-blue-300 hover:bg-gray-700'
+                  : 'text-gray-500 hover:text-blue-600 hover:bg-blue-50'
+              }`}
+            >
+              <Mail className="h-5 w-5" />
+            </button>
+            {/* Share to Teams Button */}
+            <button
+              onClick={handleOpenTeamsShare}
+              title="Share to Microsoft Teams"
+              className={`p-2 rounded-lg transition-colors ${
+                darkMode
+                  ? 'text-gray-400 hover:text-purple-300 hover:bg-gray-700'
+                  : 'text-gray-500 hover:text-purple-600 hover:bg-purple-50'
+              }`}
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className={`p-1 rounded-lg transition-colors ${
+                darkMode
+                  ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <X className="h-5 w-5 sm:h-6 sm:w-6" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -606,6 +833,236 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Teams Share Modal */}
+      {showTeamsShare && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className={`rounded-lg shadow-2xl w-full max-w-3xl flex flex-col ${
+            darkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between p-4 border-b ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Share2 className={`h-5 w-5 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+                <h3 className={`text-lg font-semibold ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  Share to Teams
+                </h3>
+              </div>
+              <button
+                onClick={() => { setShowTeamsShare(false); setSelectedGroups([]); }}
+                className={`p-1 rounded-lg transition-colors ${
+                  darkMode
+                    ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Group Selection */}
+            <div className="p-4 space-y-3">
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Select the Teams group(s) to share this release update:
+              </p>
+              <div className="space-y-2">
+                {teamsGroups.map((group) => (
+                  <label
+                    key={group.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedGroups.includes(group.id)
+                        ? darkMode
+                          ? 'bg-purple-900/30 border-purple-700 text-purple-300'
+                          : 'bg-purple-50 border-purple-300 text-purple-800'
+                        : darkMode
+                          ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-650'
+                          : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedGroups.includes(group.id)}
+                      onChange={() => handleToggleGroup(group.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-medium">{group.name}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Editable Message */}
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1">
+                  <p className={`text-xs font-medium ${
+                    darkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>Message (editable):</p>
+                  <button
+                    onClick={() => setTeamsMessage(generateTeamsMessage())}
+                    className={`text-xs px-2 py-0.5 rounded transition-colors ${
+                      darkMode
+                        ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Reset to default
+                  </button>
+                </div>
+                <textarea
+                  value={teamsMessage}
+                  onChange={(e) => setTeamsMessage(e.target.value)}
+                  rows={12}
+                  className={`w-full rounded-lg border p-3 text-xs font-mono leading-relaxed resize-y focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-gray-300'
+                      : 'bg-gray-50 border-gray-200 text-gray-700'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={`flex items-center justify-end gap-2 p-4 border-t ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <button
+                onClick={() => { setShowTeamsShare(false); setSelectedGroups([]); }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'text-gray-300 hover:bg-gray-700'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleShareToSelectedGroups}
+                disabled={selectedGroups.length === 0}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedGroups.length === 0
+                    ? darkMode
+                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : darkMode
+                      ? 'bg-purple-600 text-white hover:bg-purple-700'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+              >
+                <Share2 className="h-4 w-4" />
+                Copy & Open in Teams ({selectedGroups.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teams Share Toast Notification */}
+      {teamsShared && (
+        <div className="fixed bottom-6 right-6 z-[70] animate-in slide-in-from-bottom-4">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
+            darkMode
+              ? 'bg-gray-700 border-gray-600 text-gray-200'
+              : 'bg-white border-gray-200 text-gray-800'
+          }`}>
+            <div className={`flex items-center justify-center h-8 w-8 rounded-full ${
+              darkMode ? 'bg-green-900/40' : 'bg-green-100'
+            }`}>
+              <Check className={`h-4 w-4 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Message copied to clipboard!</p>
+              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Paste it in the Teams chat that just opened.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Preview Modal */}
+      {showEmailPreview && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+          <div className={`rounded-lg shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col ${
+            darkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            {/* Email Preview Header */}
+            <div className={`flex items-center justify-between p-4 border-b ${
+              darkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Mail className={`h-5 w-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                <h3 className={`text-lg font-semibold ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  Email Preview
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopyEmail}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    copied
+                      ? darkMode
+                        ? 'bg-green-900/30 text-green-300 border border-green-700'
+                        : 'bg-green-50 text-green-700 border border-green-200'
+                      : darkMode
+                        ? 'bg-blue-900/30 text-blue-300 border border-blue-700 hover:bg-blue-900/50'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                  }`}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy to Clipboard
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowEmailPreview(false)}
+                  className={`p-1 rounded-lg transition-colors ${
+                    darkMode
+                      ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Email Subject */}
+            <div className={`px-4 py-3 border-b ${
+              darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className={`text-sm font-medium ${
+                  darkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>Subject:</span>
+                <span className={`text-sm ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>{emailSubject}</span>
+              </div>
+            </div>
+
+            {/* Email Body */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <pre className={`whitespace-pre-wrap font-mono text-xs sm:text-sm leading-relaxed ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
+                {emailBody}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

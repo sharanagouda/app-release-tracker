@@ -105,16 +105,7 @@ const handleDelete = (release: Release) => {
 };
 
   if (releases.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-          No releases found
-        </p>
-        <p className={`text-sm mt-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          Try adjusting your filters or add a new release
-        </p>
-      </div>
-    );
+    return null;
   }
 
   return (

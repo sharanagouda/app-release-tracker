@@ -7,18 +7,28 @@ import * as firebaseReleases from '../services/firebaseReleases';
 export const useReleases = () => {
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const loadReleases = async () => {
     try {
       const loadedReleases = await firebaseReleases.getReleases();
       if (loadedReleases.length === 0) {
+        // Seed mock data only once — use a flag to prevent race conditions
         setReleases(mockReleases);
-        for (const mockRelease of mockReleases) {
-          const { id, ...releaseData } = mockRelease;
-          await firebaseReleases.addRelease(releaseData);
+        try {
+          for (const mockRelease of mockReleases) {
+            const { id, ...releaseData } = mockRelease;
+            await firebaseReleases.addRelease(releaseData);
+          }
+        } catch {
+          // Ignore duplicate errors during seeding
         }
       } else {
-        setReleases(loadedReleases);
+        // Deduplicate by Firestore document ID (should already be unique, but safety net)
+        const uniqueMap = new Map<string, Release>();
+        loadedReleases.forEach(r => uniqueMap.set(r.id, r));
+        setReleases(Array.from(uniqueMap.values()));
       }
     } catch (error) {
       console.error('Error loading releases:', error);
@@ -33,20 +43,35 @@ export const useReleases = () => {
   }, []);
 
   const addRelease = async (release: Omit<Release, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (saving) return; // Prevent double-click submissions
+    setSaving(true);
+    setSaveError(null);
     try {
       const newId = await firebaseReleases.addRelease(release as Omit<Release, 'id'>);
       // Fetch the newly created release from Firebase to get server-generated fields
       const newRelease = await firebaseReleases.getRelease(newId);
       if (newRelease) {
         // Prepend to local state — no full reload needed
-        setReleases(prev => [newRelease, ...prev]);
+        setReleases(prev => {
+          // Extra safety: ensure no duplicate ID in local state
+          if (prev.some(r => r.id === newRelease.id)) return prev;
+          return [newRelease, ...prev];
+        });
       }
     } catch (error) {
-      console.error('Error adding release:', error);
+      const message = error instanceof Error ? error.message : 'Error adding release';
+      console.error('Error adding release:', message);
+      setSaveError(message);
+      throw error; // Re-throw so the caller can handle it
+    } finally {
+      setSaving(false);
     }
   };
 
   const updateRelease = async (id: string, updates: Partial<Release>) => {
+    if (saving) return; // Prevent double-click submissions
+    setSaving(true);
+    setSaveError(null);
     try {
       await firebaseReleases.updateRelease(id, updates as Omit<Release, 'id'>);
       // Fetch the updated release from Firebase to get the latest rollout history
@@ -57,6 +82,10 @@ export const useReleases = () => {
       }
     } catch (error) {
       console.error('Error updating release:', error);
+      setSaveError(error instanceof Error ? error.message : 'Error updating release');
+      throw error;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -164,6 +193,8 @@ export const useReleases = () => {
   return {
     releases,
     loading,
+    saving,
+    saveError,
     addRelease,
     updateRelease,
     deleteRelease,

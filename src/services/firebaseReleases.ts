@@ -8,6 +8,7 @@ import {
   getDoc,
   query,
   orderBy,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Release, RolloutHistoryEntry } from '../types/release';
@@ -30,8 +31,36 @@ const getUserInfo = () => {
   };
 };
 
+// Check if a release with the same name, date, and environment already exists
+export const checkDuplicateRelease = async (
+  releaseName: string,
+  releaseDate: string,
+  environment: string
+): Promise<boolean> => {
+  const q = query(
+    collection(db, RELEASES_COLLECTION),
+    where('releaseName', '==', releaseName),
+    where('releaseDate', '==', releaseDate),
+    where('environment', '==', environment)
+  );
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+};
+
 export const addRelease = async (release: Omit<Release, 'id'>) => {
   const userInfo = getUserInfo();
+
+  // Check for duplicate before adding
+  const isDuplicate = await checkDuplicateRelease(
+    release.releaseName,
+    release.releaseDate,
+    release.environment
+  );
+  if (isDuplicate) {
+    throw new Error(
+      `A release with the name "${release.releaseName}" on ${release.releaseDate} for environment "${release.environment}" already exists.`
+    );
+  }
   
   const docRef = await addDoc(collection(db, RELEASES_COLLECTION), {
     ...release,
