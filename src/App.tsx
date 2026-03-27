@@ -196,7 +196,7 @@ function App() {
   // Reset to page 1 when filters or search change
   useEffect(() => {
     pagination.goToFirstPage();
-  }, [pagination, searchTerm, filters]);
+  }, [searchTerm, filters]);
 
   // Keyboard shortcuts
   const anyModalOpen = isModalOpen || isDetailsModalOpen || isAuthModalOpen ||
@@ -558,7 +558,8 @@ function App() {
             setSearchTerm(term);
           }}
           onExportCSV={exportToCSV}
-          onExportJSON={exportToJSON}
+          // JSON export disabled for now
+          // onExportJSON={exportToJSON}
           darkMode={darkMode}
           searchRef={searchInputRef}
         />
