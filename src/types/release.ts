@@ -1,3 +1,27 @@
+export type ActivityAction =
+  | 'created'
+  | 'updated'
+  | 'deleted'
+  | 'rollout_updated'
+  | 'status_changed'
+  | 'tags_updated';
+
+export interface ActivityLogEntry {
+  id: string;
+  releaseId: string;
+  releaseName: string;
+  action: ActivityAction;
+  /** Human-readable summary, e.g. "Changed status from In Progress → Complete" */
+  summary: string;
+  /** Field that changed (optional, for field-level diffs) */
+  field?: string;
+  oldValue?: string;
+  newValue?: string;
+  timestamp: string; // ISO string
+  userEmail: string;
+  userName: string;
+}
+
 export interface RolloutHistoryEntry {
   percentage: number;
   date: string;
@@ -42,6 +66,7 @@ export interface Release {
   changes: string[];
   notes?: string;
   tags?: string[]; // Release tags/labels e.g. ['hotfix', 'critical', 'feature']
+  isNative?: boolean; // Whether this is a native release
   createdAt: string;
   updatedAt: string;
   createdBy?: string; // Email of user who created

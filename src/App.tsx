@@ -8,6 +8,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ReleaseTable } from './components/ReleaseTable';
 import { ReleaseModal } from './components/ReleaseModal';
 import { ReleaseDetailsModal } from './components/ReleaseDetailsModal';
+import { ActivityLogModal } from './components/ActivityLogModal';
 import { AuthModal } from './components/AuthModal';
 import { ExportConfirmationModal } from './components/Exportconfirmationmodal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
@@ -37,6 +38,8 @@ function App() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [releaseToDelete, setReleaseToDelete] = useState<Release | null>(null);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [activityLogRelease, setActivityLogRelease] = useState<Release | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -134,7 +137,8 @@ function App() {
                              (cr.buildId || '').toLowerCase().includes(searchLower)
                            );
                          }) ||
-                         (release.tags || []).some(t => t.toLowerCase().includes(searchLower));
+                         (release.tags || []).some(t => t.toLowerCase().includes(searchLower)) ||
+                         (release.isNative && 'native'.includes(searchLower));
     
     const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
     const matchesEnvironment = !filters.environment || filters.environment === 'All' || environment === filters.environment;
@@ -179,7 +183,7 @@ function App() {
 
   // Keyboard shortcuts
   const anyModalOpen = isModalOpen || isDetailsModalOpen || isAuthModalOpen ||
-    isExportModalOpen || isDeleteModalOpen || isShortcutsHelpOpen;
+    isExportModalOpen || isDeleteModalOpen || isShortcutsHelpOpen || isActivityLogOpen;
 
   useKeyboardShortcuts([
     {
@@ -207,14 +211,15 @@ function App() {
       description: 'Close modal / clear search',
       allowInInput: true,
       action: () => {
-        if (isShortcutsHelpOpen) { setIsShortcutsHelpOpen(false); return; }
-        if (isModalOpen) { setIsModalOpen(false); setEditingRelease(null); return; }
-        if (isDetailsModalOpen) { setIsDetailsModalOpen(false); setSelectedRelease(null); return; }
-        if (isAuthModalOpen) { setIsAuthModalOpen(false); return; }
-        if (isExportModalOpen) { setIsExportModalOpen(false); return; }
-        if (isDeleteModalOpen) { setIsDeleteModalOpen(false); setReleaseToDelete(null); return; }
-        if (searchTerm) { setSearchTerm(''); searchInputRef.current?.blur(); }
-      },
+      if (isShortcutsHelpOpen) { setIsShortcutsHelpOpen(false); return; }
+      if (isActivityLogOpen) { setIsActivityLogOpen(false); setActivityLogRelease(null); return; }
+      if (isModalOpen) { setIsModalOpen(false); setEditingRelease(null); return; }
+      if (isDetailsModalOpen) { setIsDetailsModalOpen(false); setSelectedRelease(null); return; }
+      if (isAuthModalOpen) { setIsAuthModalOpen(false); return; }
+      if (isExportModalOpen) { setIsExportModalOpen(false); return; }
+      if (isDeleteModalOpen) { setIsDeleteModalOpen(false); setReleaseToDelete(null); return; }
+      if (searchTerm) { setSearchTerm(''); searchInputRef.current?.blur(); }
+    },
     },
     {
       key: 'ArrowLeft',
@@ -270,6 +275,11 @@ function App() {
   const handleViewDetails = (release: Release) => {
     setSelectedRelease(release);
     setIsDetailsModalOpen(true);
+  };
+
+  const handleViewActivityLog = (release: Release) => {
+    setActivityLogRelease(release);
+    setIsActivityLogOpen(true);
   };
 
   const handleSaveRelease = async (releaseData: Omit<Release, 'id'>) => {
@@ -677,8 +687,8 @@ function App() {
                   <button
                     onClick={() => handleViewDetails(release)}
                     className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${
-                      darkMode 
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                      darkMode
+                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
@@ -687,8 +697,8 @@ function App() {
                   <button
                     onClick={() => handleEditRelease(release)}
                     className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${
-                      darkMode 
-                        ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50' 
+                      darkMode
+                        ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50'
                         : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                     }`}
                   >
@@ -697,8 +707,8 @@ function App() {
                   <button
                     onClick={() => handleDeleteRelease(release)}
                     className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                      darkMode 
-                        ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50' 
+                      darkMode
+                        ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
                         : 'bg-red-100 text-red-700 hover:bg-red-200'
                     }`}
                   >
@@ -753,6 +763,7 @@ function App() {
         }}
         release={selectedRelease}
         darkMode={darkMode}
+        onViewActivityLog={handleViewActivityLog}
       />
 
       <AuthModal
@@ -785,6 +796,17 @@ function App() {
       <KeyboardShortcutsHelp
         isOpen={isShortcutsHelpOpen}
         onClose={() => setIsShortcutsHelpOpen(false)}
+        darkMode={darkMode}
+      />
+
+      <ActivityLogModal
+        isOpen={isActivityLogOpen}
+        onClose={() => {
+          setIsActivityLogOpen(false);
+          setActivityLogRelease(null);
+        }}
+        releaseId={activityLogRelease?.id ?? ''}
+        releaseName={activityLogRelease?.releaseName ?? ''}
         darkMode={darkMode}
       />
     </div>

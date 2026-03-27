@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calendar, Package, FileText, Clock, ListChecks, Mail, Share2, Copy, Check } from 'lucide-react';
+import { X, Calendar, Package, FileText, Clock, ListChecks, Mail, Share2, Copy, Check, Activity } from 'lucide-react';
 import { Release, PlatformRelease, ConceptRelease } from '../types/release';
 import { TagBadge } from './TagInput';
 
@@ -9,6 +9,8 @@ interface ReleaseDetailsModalProps {
   release: Release | null;
   darkMode?: boolean;
   currentUserEmail?: string;
+  /** Called when the user clicks the Activity Log button */
+  onViewActivityLog?: (release: Release) => void;
 }
 
 const getStatusColor = (status: ConceptRelease['status'], darkMode: boolean = false) => {
@@ -77,6 +79,9 @@ const generateEmailContent = (release: Release): { subject: string; body: string
   let body = `Release: ${release.releaseName}\n`;
   body += `Date: ${releaseDate}\n`;
   body += `Environment: ${release.environment || release.concept || 'N/A'}\n`;
+  if (release.tags && release.tags.length > 0) {
+    body += `Tags: ${release.tags.join(', ')}\n`;
+  }
   body += `\n${'─'.repeat(50)}\n\n`;
 
   // Platform details
@@ -128,6 +133,7 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
   release,
   darkMode = false,
   currentUserEmail = 'user@example.com',
+  onViewActivityLog,
 }) => {
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [showTeamsShare, setShowTeamsShare] = useState(false);
@@ -155,16 +161,56 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
   const { subject: emailSubject, body: emailBody } = generateEmailContent(release);
 
   const generateTeamsMessage = (): string => {
-    const releaseDate = new Date(release.releaseDate).toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'long',
-    }).toUpperCase();
+    // Helper for ordinal suffix (st, nd, rd, th)
+    const getOrdinalSuffix = (day: number): string => {
+      if (day > 3 && day < 21) return 'th';
+      switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+
+    // Try to extract date from release name
+    // Pattern 1: "30_July" or "30 July" (Day Month)
+    // Pattern 2: "July_30" or "July 30" (Month Day)
+    let displayDate = '';
+    
+    const isMonth = (s: string) => {
+      const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      return months.some(m => s.toLowerCase().startsWith(m));
+    };
+
+    const dayMonthMatch = release.releaseName.match(/(\d{1,2})[._\s-]+([A-Za-z]+)/);
+    const monthDayMatch = release.releaseName.match(/([A-Za-z]+)[._\s-]+(\d{1,2})/);
+    
+    if (dayMonthMatch && isMonth(dayMonthMatch[2])) {
+      const day = parseInt(dayMonthMatch[1], 10);
+      const month = dayMonthMatch[2];
+      displayDate = `${day}${getOrdinalSuffix(day)} ${month}`;
+    } else if (monthDayMatch && isMonth(monthDayMatch[1])) {
+      const day = parseInt(monthDayMatch[2], 10);
+      const month = monthDayMatch[1];
+      displayDate = `${day}${getOrdinalSuffix(day)} ${month}`;
+    } else {
+      const dateObj = new Date(release.releaseDate);
+      const day = dateObj.getDate();
+      const month = dateObj.toLocaleDateString('en-US', { month: 'long' });
+      displayDate = `${day}${getOrdinalSuffix(day)} ${month}`;
+    }
+    
+    displayDate = displayDate.toUpperCase();
 
     const env = (release.environment || release.concept || 'Production').toUpperCase();
 
-    let message = `========= ${release.releaseName.toUpperCase()} ${releaseDate} - NATIVE RELEASE STATUS ==========\n\n`;
+    let message = `========= RN APPS ${displayDate} - ${release.isNative ? 'NATIVE ' : ''}RELEASE STATUS ==========\n\n`;
     message += `All apps are submitted for review with below details.\n`;
-    message += `Environment: ${env}\n\n`;
+    message += `Environment: ${env}\n`;
+    if (release.tags && release.tags.length > 0) {
+      message += `Tags: ${release.tags.join(', ')}\n`;
+    }
+    message += `\n`;
 
     // Group concept releases by concepts for a cleaner format
     release.platforms.forEach((platform) => {
@@ -288,6 +334,20 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
             Release Details
           </h2>
           <div className="flex items-center gap-2">
+            {/* Activity Log Button */}
+            {onViewActivityLog && (
+              <button
+                onClick={() => onViewActivityLog(release)}
+                title="View activity log"
+                className={`p-2 rounded-lg transition-colors ${
+                  darkMode
+                    ? 'text-gray-400 hover:text-green-300 hover:bg-gray-700'
+                    : 'text-gray-500 hover:text-green-600 hover:bg-green-50'
+                }`}
+              >
+                <Activity className="h-5 w-5" />
+              </button>
+            )}
             {/* Email Preview Button */}
             <button
               onClick={() => setShowEmailPreview(true)}

@@ -39,10 +39,13 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
 }) => {
   const [loadedFromRelease, setLoadedFromRelease] = useState<Release | null>(null);
   const [loadError, setLoadError] = useState('');
+  // Map of "platformIndex-conceptIndex" → error message for rollout % decrease attempts
+  const [rolloutErrors, setRolloutErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     releaseDate: '',
     releaseName: '',
     environment: '',
+    isNative: false,
     platforms: [
       { platform: 'iOS' as const, conceptReleases: [{ ...initialConceptRelease }] },
       { platform: 'Android GMS' as const, conceptReleases: [{ ...initialConceptRelease }] },
@@ -59,6 +62,7 @@ useEffect(() => {
   // Reset load state when modal opens/closes
   setLoadedFromRelease(null);
   setLoadError('');
+  setRolloutErrors({});
   if (editingRelease) {
     // Convert old format to new format if needed
     const convertedPlatforms = editingRelease.platforms.map(p => {
@@ -102,6 +106,7 @@ useEffect(() => {
       releaseDate: editingRelease.releaseDate,
       releaseName: editingRelease.releaseName,
       environment: editingRelease.environment || editingRelease.concept || '',
+      isNative: editingRelease.isNative || false,
       platforms: convertedPlatforms,
       changes: editingRelease.changes,
       notes: editingRelease.notes || '',
@@ -114,6 +119,7 @@ useEffect(() => {
         releaseDate: '',
         releaseName: '',
         environment: '',
+        isNative: false,
         platforms: [
           { platform: 'iOS', conceptReleases: [{ ...initialConceptRelease }] },
           { platform: 'Android GMS', conceptReleases: [{ ...initialConceptRelease }] },
@@ -174,6 +180,7 @@ useEffect(() => {
       releaseDate: selected.releaseDate,
       releaseName: selected.releaseName,
       environment: selected.environment || selected.concept || '',
+      isNative: selected.isNative || false,
       platforms: convertedPlatforms,
       changes: selected.changes && selected.changes.length > 0 ? selected.changes : [''],
       notes: selected.notes || '',
@@ -188,6 +195,12 @@ useEffect(() => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoadError('');
+
+    // Block save if any rollout decrease errors are present
+    if (Object.keys(rolloutErrors).length > 0) {
+      setLoadError('Please fix the rollout percentage errors before saving.');
+      return;
+    }
 
     // If form was loaded from a previous release, check that at least one field has changed
     if (loadedFromRelease && !editingRelease) {
@@ -370,7 +383,14 @@ useEffect(() => {
     }
   };
 
-  const addVersionChange = (platformIndex: number, conceptIndex: number) => {
+  /**
+   * Update versionChanges from a textarea value.
+   * Splits the raw text by newlines and stores as string[].
+   * Empty lines are kept during editing so the cursor position is preserved;
+   * they are filtered out on save (in handleSubmit).
+   */
+  const updateVersionChangesText = (platformIndex: number, conceptIndex: number, text: string) => {
+    const lines = text.split('\n');
     setFormData(prev => ({
       ...prev,
       platforms: prev.platforms.map((platform, pIdx) => {
@@ -379,66 +399,11 @@ useEffect(() => {
           ...platform,
           conceptReleases: platform.conceptReleases.map((cr, cIdx) => {
             if (cIdx !== conceptIndex) return cr;
-            return { ...cr, versionChanges: [...(cr.versionChanges || ['']), ''] };
+            return { ...cr, versionChanges: lines };
           })
         };
       })
     }));
-  };
-
-  const removeVersionChange = (platformIndex: number, conceptIndex: number, changeIndex: number) => {
-    setFormData(prev => ({
-      ...prev,
-      platforms: prev.platforms.map((platform, pIdx) => {
-        if (pIdx !== platformIndex || !platform.conceptReleases) return platform;
-        return {
-          ...platform,
-          conceptReleases: platform.conceptReleases.map((cr, cIdx) => {
-            if (cIdx !== conceptIndex) return cr;
-            return { ...cr, versionChanges: (cr.versionChanges || []).filter((_, i) => i !== changeIndex) };
-          })
-        };
-      })
-    }));
-  };
-
-  const updateVersionChange = (platformIndex: number, conceptIndex: number, changeIndex: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      platforms: prev.platforms.map((platform, pIdx) => {
-        if (pIdx !== platformIndex || !platform.conceptReleases) return platform;
-        return {
-          ...platform,
-          conceptReleases: platform.conceptReleases.map((cr, cIdx) => {
-            if (cIdx !== conceptIndex) return cr;
-            return {
-              ...cr,
-              versionChanges: (cr.versionChanges || []).map((ch, i) => i === changeIndex ? value : ch)
-            };
-          })
-        };
-      })
-    }));
-  };
-
-  const handleVersionChangeKeyPress = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-    platformIndex: number,
-    conceptIndex: number,
-    changeIndex: number
-  ) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const currentChanges = formData.platforms[platformIndex]?.conceptReleases?.[conceptIndex]?.versionChanges || [];
-      if (currentChanges[changeIndex]?.trim() !== '') {
-        addVersionChange(platformIndex, conceptIndex);
-        setTimeout(() => {
-          const inputs = document.querySelectorAll(`[data-version-change="${platformIndex}-${conceptIndex}"]`);
-          const nextInput = inputs[changeIndex + 1] as HTMLInputElement;
-          if (nextInput) nextInput.focus();
-        }, 50);
-      }
-    }
   };
 
   const toggleConcept = (platformIndex: number, conceptIndex: number, concept: string) => {
@@ -653,11 +618,35 @@ useEffect(() => {
 
             {/* Platform Details */}
             <div>
-              <h3 className={`text-base sm:text-lg font-medium mb-4 ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>
-                Platform Details
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className={`text-base sm:text-lg font-medium ${
+                  darkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  Platform Details
+                </h3>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isNative"
+                    checked={formData.isNative}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (editingRelease && !editingRelease.isNative && checked) {
+                        if (!window.confirm("Are you sure you want to mark this as a Native Release?")) {
+                          return;
+                        }
+                      }
+                      setFormData(prev => ({ ...prev, isNative: checked }));
+                    }}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="isNative" className={`text-sm font-medium ${
+                    darkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
+                    Native Release
+                  </label>
+                </div>
+              </div>
               <div className="space-y-4 sm:space-y-6">
                 {formData.platforms.map((platform, platformIndex) => (
                   <div key={platformIndex} className={`rounded-lg p-3 sm:p-4 border-2 ${
@@ -775,22 +764,45 @@ useEffect(() => {
                                 max="100"
                                 value={conceptRelease.rolloutPercentage}
                                 onChange={(e) => {
-                                  const value = e.target.value;
-                                  const percentage = value === '' ? 0 : Number(value);
-                                  const currentPercentage = conceptRelease.rolloutPercentage;
-                                  
-                                  // Update percentage value
-                                  updateConceptRelease(platformIndex, conceptIndex, 'rolloutPercentage', percentage);
-                                  
-                                  // Auto-suggest status based on percentage (user can still override)
-                                  if (percentage !== currentPercentage) {
-                                    const suggestedStatus = percentage === 100 ? 'Complete' :
-                                                          percentage === 0 ? 'Not Started' : 'In Progress';
-                                    updateConceptRelease(platformIndex, conceptIndex, 'status', suggestedStatus);
-                                  }
-                                  // Note: Rollout history is tracked server-side in firebaseReleases.updateRelease()
-                                  // when the form is saved, not on every keystroke
-                                }}
+                                   const value = e.target.value;
+                                   const percentage = value === '' ? 0 : Number(value);
+                                   const errorKey = `${platformIndex}-${conceptIndex}`;
+
+                                   // Prevent decreasing rollout when editing an existing release
+                                   if (editingRelease) {
+                                     const originalPlatform = editingRelease.platforms[platformIndex];
+                                     const originalCr = originalPlatform?.conceptReleases?.[conceptIndex];
+                                     const originalPct = originalCr?.rolloutPercentage ?? 0;
+                                     if (percentage < originalPct) {
+                                       setRolloutErrors(prev => ({
+                                         ...prev,
+                                         [errorKey]: `Rollout cannot be decreased below ${originalPct}%`,
+                                       }));
+                                       return; // Don't update form state
+                                     }
+                                   }
+
+                                   // Clear any previous error for this field
+                                   setRolloutErrors(prev => {
+                                     const next = { ...prev };
+                                     delete next[errorKey];
+                                     return next;
+                                   });
+
+                                   const currentPercentage = conceptRelease.rolloutPercentage;
+                                   
+                                   // Update percentage value
+                                   updateConceptRelease(platformIndex, conceptIndex, 'rolloutPercentage', percentage);
+                                   
+                                   // Auto-suggest status based on percentage (user can still override)
+                                   if (percentage !== currentPercentage) {
+                                     const suggestedStatus = percentage === 100 ? 'Complete' :
+                                                           percentage === 0 ? 'Not Started' : 'In Progress';
+                                     updateConceptRelease(platformIndex, conceptIndex, 'status', suggestedStatus);
+                                   }
+                                   // Note: Rollout history is tracked server-side in firebaseReleases.updateRelease()
+                                   // when the form is saved, not on every keystroke
+                                 }}
                                 onKeyDown={(e) => {
                                   // Allow backspace/delete to clear the field
                                   if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -802,11 +814,19 @@ useEffect(() => {
                                   }
                                 }}
                                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                  darkMode 
-                                    ? 'bg-gray-700 border-gray-600 text-white' 
-                                    : 'bg-white border-gray-300 text-gray-900'
-                                }`}
+                                  rolloutErrors[`${platformIndex}-${conceptIndex}`]
+                                    ? 'border-red-500 focus:ring-red-500'
+                                    : darkMode
+                                    ? 'border-gray-600'
+                                    : 'border-gray-300'
+                                } ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
                               />
+                              {rolloutErrors[`${platformIndex}-${conceptIndex}`] && (
+                                <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                  <span>⚠</span>
+                                  {rolloutErrors[`${platformIndex}-${conceptIndex}`]}
+                                </p>
+                              )}
                             </div>
 
                             <div>
@@ -911,53 +931,20 @@ useEffect(() => {
                               <span className={`ml-1 text-xs font-normal ${
                                 darkMode ? 'text-gray-400' : 'text-gray-500'
                               }`}>
-                                (What's new in this version)
+                                (What's new in this version — one point per line)
                               </span>
                             </label>
-                            <div className="space-y-2">
-                              {(conceptRelease.versionChanges || ['']).map((vChange, vIdx) => (
-                                <div key={vIdx} className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    data-version-change={`${platformIndex}-${conceptIndex}`}
-                                    value={vChange}
-                                    onChange={(e) => updateVersionChange(platformIndex, conceptIndex, vIdx, e.target.value)}
-                                    onKeyPress={(e) => handleVersionChangeKeyPress(e, platformIndex, conceptIndex, vIdx)}
-                                    className={`flex-1 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                      darkMode 
-                                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                                    }`}
-                                    placeholder="e.g., Fixed checkout crash on iOS 17..."
-                                  />
-                                  {(conceptRelease.versionChanges || ['']).length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => removeVersionChange(platformIndex, conceptIndex, vIdx)}
-                                      className={`transition-colors flex-shrink-0 ${
-                                        darkMode 
-                                          ? 'text-red-400 hover:text-red-300' 
-                                          : 'text-red-600 hover:text-red-800'
-                                      }`}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={() => addVersionChange(platformIndex, conceptIndex)}
-                                className={`flex items-center gap-1 text-xs transition-colors ${
-                                  darkMode 
-                                    ? 'text-blue-400 hover:text-blue-300' 
-                                    : 'text-blue-600 hover:text-blue-800'
-                                }`}
-                              >
-                                <Plus className="h-3 w-3" />
-                                Add Version Change
-                              </button>
-                            </div>
+                            <textarea
+                              rows={4}
+                              value={(conceptRelease.versionChanges || []).join('\n')}
+                              onChange={(e) => updateVersionChangesText(platformIndex, conceptIndex, e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y ${
+                                darkMode
+                                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                              }`}
+                              placeholder={"Fixed checkout crash on iOS 17\nAdded dark mode support\nImproved performance on low-end devices"}
+                            />
                           </div>
                           )}
                         </div>

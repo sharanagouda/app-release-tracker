@@ -29,6 +29,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
       'Release Date',
       'Release Name',
       'Environment',
+      'Native',
       'Platform',
       'Concept Release ID',
       'Concepts',
@@ -41,8 +42,11 @@ export const exportToCSVFunction = (releases: Release[]): void => {
       'Version Changes',
       'Changes',
       'General Notes',
+      'Tags',
       'Created At',
-      'Updated At'
+      'Created By',
+      'Updated At',
+      'Updated By'
     ];
     rows.push(headers);
 
@@ -64,6 +68,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
               safeStringify(release.releaseDate),
               safeStringify(release.releaseName),
               safeStringify(release.environment),
+              safeStringify(release.isNative ? 'Yes' : 'No'),
               safeStringify(platform.platform),
               safeStringify(cr.id),
               safeStringify(cr.concepts),
@@ -76,8 +81,11 @@ export const exportToCSVFunction = (releases: Release[]): void => {
               safeStringify(cr.versionChanges),
               safeStringify(release.changes),
               safeStringify(release.notes),
+              safeStringify(release.tags),
               safeStringify(release.createdAt),
-              safeStringify(release.updatedAt)
+              safeStringify(release.createdByName || release.createdBy),
+              safeStringify(release.updatedAt),
+              safeStringify(release.updatedByName || release.updatedBy)
             ]);
           }
         } else {
@@ -87,6 +95,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
             safeStringify(release.releaseDate),
             safeStringify(release.releaseName),
             safeStringify(release.environment),
+            safeStringify(release.isNative ? 'Yes' : 'No'),
             safeStringify(platform.platform),
             '',
             safeStringify(platform.concepts || ['All Concepts']),
@@ -99,8 +108,11 @@ export const exportToCSVFunction = (releases: Release[]): void => {
             '', // Version Changes (not available in legacy format)
             safeStringify(release.changes),
             safeStringify(release.notes),
+            safeStringify(release.tags),
             safeStringify(release.createdAt),
-            safeStringify(release.updatedAt)
+            safeStringify(release.createdByName || release.createdBy),
+            safeStringify(release.updatedAt),
+            safeStringify(release.updatedByName || release.updatedBy)
           ]);
         }
       }
@@ -197,11 +209,15 @@ export const exportToJSONFunction = (releases: Release[]): void => {
         releaseDate: release.releaseDate || '',
         releaseName: release.releaseName || '',
         environment: release.environment || '',
+        isNative: release.isNative || false,
         platforms: cleanPlatforms,
         changes: cleanChanges,
         notes: release.notes || '',
+        tags: release.tags || [],
         createdAt: release.createdAt || '',
-        updatedAt: release.updatedAt || ''
+        createdBy: release.createdByName || release.createdBy || '',
+        updatedAt: release.updatedAt || '',
+        updatedBy: release.updatedByName || release.updatedBy || ''
       });
     }
 
@@ -230,6 +246,7 @@ const buildJSONString = (data: any[]): string => {
     result += indent + indent + `"releaseDate": "${item.releaseDate}",\n`;
     result += indent + indent + `"releaseName": "${item.releaseName}",\n`;
     result += indent + indent + `"environment": "${item.environment}",\n`;
+    result += indent + indent + `"isNative": ${item.isNative || false},\n`;
     
     // Platforms
     result += indent + indent + '"platforms": [\n';
@@ -252,7 +269,22 @@ const buildJSONString = (data: any[]): string => {
         result += indent + indent + indent + indent + indent + indent + `"notes": "${cr.notes}",\n`;
         result += indent + indent + indent + indent + indent + indent + `"buildLink": "${cr.buildLink}",\n`;
         result += indent + indent + indent + indent + indent + indent + `"versionChanges": [${(cr.versionChanges || []).map((vc: string) => `"${vc}"`).join(', ')}],\n`;
-        result += indent + indent + indent + indent + indent + indent + `"rolloutHistory": []\n`;
+        
+        // Rollout History
+        result += indent + indent + indent + indent + indent + indent + `"rolloutHistory": [\n`;
+        const history = cr.rolloutHistory || [];
+        for (let h = 0; h < history.length; h++) {
+          const entry = history[h];
+          result += indent + indent + indent + indent + indent + indent + indent + `{\n`;
+          result += indent + indent + indent + indent + indent + indent + indent + indent + `"percentage": ${entry.percentage},\n`;
+          result += indent + indent + indent + indent + indent + indent + indent + indent + `"date": "${entry.date}",\n`;
+          result += indent + indent + indent + indent + indent + indent + indent + indent + `"notes": "${entry.notes}"\n`;
+          result += indent + indent + indent + indent + indent + indent + indent + `}`;
+          if (h < history.length - 1) result += ',';
+          result += '\n';
+        }
+        result += indent + indent + indent + indent + indent + indent + `]\n`;
+        
         result += indent + indent + indent + indent + indent + '}';
         if (k < platform.conceptReleases.length - 1) result += ',';
         result += '\n';
@@ -267,8 +299,11 @@ const buildJSONString = (data: any[]): string => {
     // Changes
     result += indent + indent + `"changes": [${item.changes.map((c: string) => `"${c}"`).join(', ')}],\n`;
     result += indent + indent + `"notes": "${item.notes}",\n`;
+    result += indent + indent + `"tags": [${(item.tags || []).map((t: string) => `"${t}"`).join(', ')}],\n`;
     result += indent + indent + `"createdAt": "${item.createdAt}",\n`;
-    result += indent + indent + `"updatedAt": "${item.updatedAt}"\n`;
+    result += indent + indent + `"createdBy": "${item.createdBy}",\n`;
+    result += indent + indent + `"updatedAt": "${item.updatedAt}",\n`;
+    result += indent + indent + `"updatedBy": "${item.updatedBy}"\n`;
     result += indent + '}';
     if (i < data.length - 1) result += ',';
     result += '\n';
@@ -387,7 +422,7 @@ export const exportFilteredToCSV = (
       }
     }
     
-    exportToCSV(filtered);
+    exportToCSVFunction(filtered);
   } catch (error) {
     console.error('Filtered CSV Export Error:', error);
     alert('Error exporting filtered data to CSV.');
@@ -485,7 +520,7 @@ export const exportFilteredToJSON = (
       }
     }
     
-    exportToJSON(filtered);
+    exportToJSONFunction(filtered);
   } catch (error) {
     console.error('Filtered JSON Export Error:', error);
     alert('Error exporting filtered data to JSON.');

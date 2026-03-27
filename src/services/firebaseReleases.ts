@@ -13,6 +13,7 @@ import {
 import { db } from './firebase';
 import { Release, RolloutHistoryEntry } from '../types/release';
 import { getCurrentUser } from './firebaseAuth';
+import { addActivityLog } from './firebaseActivityLog';
 
 const RELEASES_COLLECTION = 'releases';
 
@@ -71,7 +72,56 @@ export const addRelease = async (release: Omit<Release, 'id'>) => {
     updatedBy: userInfo.email,
     updatedByName: userInfo.displayName,
   });
+
+  // Log the creation (fire-and-forget — don't block the caller)
+  addActivityLog({
+    releaseId: docRef.id,
+    releaseName: release.releaseName,
+    action: 'created',
+    summary: `Release "${release.releaseName}" was created`,
+    userEmail: userInfo.email || 'unknown',
+    userName: userInfo.displayName || 'Unknown',
+  }).catch(console.error);
+
   return docRef.id;
+};
+
+// ─── Field-level diff helpers ─────────────────────────────────────────────────
+
+/** Compare two scalar values and return a human-readable change summary, or null if unchanged. */
+const diffScalar = (
+  field: string,
+  label: string,
+  oldVal: unknown,
+  newVal: unknown
+): { field: string; summary: string; oldValue: string; newValue: string } | null => {
+  const oldStr = oldVal == null ? '' : String(oldVal);
+  const newStr = newVal == null ? '' : String(newVal);
+  if (oldStr === newStr) return null;
+  return {
+    field,
+    summary: `Changed ${label} from "${oldStr}" to "${newStr}"`,
+    oldValue: oldStr,
+    newValue: newStr,
+  };
+};
+
+/** Compare two string arrays and return a summary if they differ. */
+const diffStringArray = (
+  field: string,
+  label: string,
+  oldArr: string[] | undefined,
+  newArr: string[] | undefined
+): { field: string; summary: string; oldValue: string; newValue: string } | null => {
+  const oldStr = (oldArr || []).join(', ');
+  const newStr = (newArr || []).join(', ');
+  if (oldStr === newStr) return null;
+  return {
+    field,
+    summary: `Changed ${label}`,
+    oldValue: oldStr || '(none)',
+    newValue: newStr || '(none)',
+  };
 };
 
 export const updateRelease = async (id: string, release: Omit<Release, 'id'>) => {
@@ -135,6 +185,78 @@ export const updateRelease = async (id: string, release: Omit<Release, 'id'>) =>
       updatedBy: userInfo.email,
       updatedByName: userInfo.displayName,
     });
+
+    // ── Build field-level diff for activity log ──────────────────────────────
+    const diffs: Array<{ field: string; summary: string; oldValue: string; newValue: string }> = [];
+
+    const d1 = diffScalar('releaseName', 'release name', existingRelease.releaseName, release.releaseName);
+    if (d1) diffs.push(d1);
+
+    const d2 = diffScalar('releaseDate', 'release date', existingRelease.releaseDate, release.releaseDate);
+    if (d2) diffs.push(d2);
+
+    const d3 = diffScalar('environment', 'environment', existingRelease.environment, release.environment);
+    if (d3) diffs.push(d3);
+
+    const d4 = diffScalar('notes', 'notes', existingRelease.notes, release.notes);
+    if (d4) diffs.push(d4);
+
+    const d5 = diffStringArray('changes', 'changes list', existingRelease.changes, release.changes);
+    if (d5) diffs.push(d5);
+
+    const d6 = diffStringArray('tags', 'tags', existingRelease.tags, release.tags);
+    if (d6) diffs.push(d6);
+
+    const d7 = diffScalar('isNative', 'native status', existingRelease.isNative, release.isNative);
+    if (d7) diffs.push(d7);
+
+    // Check platform-level rollout / status changes
+    release.platforms.forEach((platform, pi) => {
+      const existingPlatform = existingRelease.platforms[pi];
+      platform.conceptReleases.forEach((cr, ci) => {
+        const existingCr = existingPlatform?.conceptReleases?.[ci];
+        if (!existingCr) return;
+
+        if (existingCr.rolloutPercentage !== cr.rolloutPercentage) {
+          diffs.push({
+            field: `platforms[${pi}].conceptReleases[${ci}].rolloutPercentage`,
+            summary: `${platform.platform} rollout updated from ${existingCr.rolloutPercentage}% to ${cr.rolloutPercentage}%`,
+            oldValue: `${existingCr.rolloutPercentage}%`,
+            newValue: `${cr.rolloutPercentage}%`,
+          });
+        }
+
+        if (existingCr.status !== cr.status) {
+          diffs.push({
+            field: `platforms[${pi}].conceptReleases[${ci}].status`,
+            summary: `${platform.platform} status changed from "${existingCr.status}" to "${cr.status}"`,
+            oldValue: existingCr.status,
+            newValue: cr.status,
+          });
+        }
+      });
+    });
+
+    // Write one activity log entry per changed field (fire-and-forget)
+    if (diffs.length > 0) {
+      const logPromises = diffs.map((diff) =>
+        addActivityLog({
+          releaseId: id,
+          releaseName: release.releaseName,
+          action: diff.field.includes('rollout') ? 'rollout_updated'
+                : diff.field.includes('status') ? 'status_changed'
+                : diff.field === 'tags' ? 'tags_updated'
+                : 'updated',
+          summary: diff.summary,
+          field: diff.field,
+          oldValue: diff.oldValue,
+          newValue: diff.newValue,
+          userEmail: userInfo.email || 'unknown',
+          userName: userInfo.displayName || 'Unknown',
+        }).catch(console.error)
+      );
+      await Promise.allSettled(logPromises);
+    }
   } else {
     // If document doesn't exist (shouldn't happen), just update normally
     await updateDoc(docRef, {
@@ -148,7 +270,23 @@ export const updateRelease = async (id: string, release: Omit<Release, 'id'>) =>
 
 export const deleteRelease = async (id: string) => {
   const docRef = doc(db, RELEASES_COLLECTION, id);
+
+  // Fetch release name before deleting for the log
+  const docSnap = await getDoc(docRef);
+  const releaseName = docSnap.exists() ? (docSnap.data() as Release).releaseName : id;
+  const userInfo = getUserInfo();
+
   await deleteDoc(docRef);
+
+  // Log the deletion (fire-and-forget)
+  addActivityLog({
+    releaseId: id,
+    releaseName,
+    action: 'deleted',
+    summary: `Release "${releaseName}" was deleted`,
+    userEmail: userInfo.email || 'unknown',
+    userName: userInfo.displayName || 'Unknown',
+  }).catch(console.error);
 };
 
 export const getReleases = async (): Promise<Release[]> => {

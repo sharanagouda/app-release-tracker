@@ -6,7 +6,7 @@ import { TagBadge } from './TagInput';
 interface ReleaseTableProps {
   releases: Release[];
   onEdit: (release: Release) => void;
-  onDelete: (release: Release) => void; // Change from (id: string) => void
+  onDelete: (release: Release) => void;
   onViewDetails: (release: Release) => void;
   isAdmin: boolean;
   onAuthRequired: (action: string) => void;
@@ -184,6 +184,15 @@ const handleDelete = (release: Release) => {
               >
                 <td className="px-4 py-4">
                   <div className="flex flex-col">
+                    {release.isNative && (
+                      <div className="mb-1">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          NATIVE
+                        </span>
+                      </div>
+                    )}
                     <div className={`text-sm font-medium ${
                       darkMode ? 'text-gray-100' : 'text-gray-900'
                     }`}>
@@ -348,6 +357,7 @@ const handleDelete = (release: Release) => {
                     >
                       <Eye className="w-4 h-4" />
                     </button>
+
                     <button
                       onClick={() => handleEdit(release)}
                       className={`p-1 rounded transition-colors ${
