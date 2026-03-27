@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun, Keyboard, LogIn } from 'lucide-react';
 import { Release, FilterOptions } from './types/release';
 import { exportToCSVFunction, exportToJSONFunction } from './utils/export';
 import { useReleases } from './hooks/useReleases';
+import { usePagination } from './hooks/usePagination';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ReleaseTable } from './components/ReleaseTable';
 import { ReleaseModal } from './components/ReleaseModal';
 import { ReleaseDetailsModal } from './components/ReleaseDetailsModal';
@@ -11,6 +13,9 @@ import { ExportConfirmationModal } from './components/Exportconfirmationmodal';
 import { DeleteConfirmationModal } from './components/DeleteConfirmationModal';
 import { FilterBar } from './components/FilterBar';
 import { StatCard } from './components/StatCard';
+import { Pagination } from './components/Pagination';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { TagBadge } from './components/TagInput';
 import { onAuthChange, logout } from './services/firebaseAuth';
 import { User } from 'firebase/auth';
 
@@ -31,6 +36,8 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [releaseToDelete, setReleaseToDelete] = useState<Release | null>(null);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthChange((authUser) => {
@@ -117,16 +124,17 @@ function App() {
     const environment = release.environment || release.concept || '';
     const searchLower = searchTerm.toLowerCase();
     
-    // Fixed search - safely check for undefined values
+    // Search across name, environment, version, build ID, and tags
     const matchesSearch = release.releaseName?.toLowerCase().includes(searchLower) ||
                          environment.toLowerCase().includes(searchLower) ||
                          (release.platforms || []).some(p => {
                            const conceptReleases = getConceptReleases(p);
-                           return conceptReleases.some((cr: any) => 
+                           return conceptReleases.some((cr: any) =>
                              (cr.version || '').toLowerCase().includes(searchLower) ||
                              (cr.buildId || '').toLowerCase().includes(searchLower)
                            );
-                         });
+                         }) ||
+                         (release.tags || []).some(t => t.toLowerCase().includes(searchLower));
     
     const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
     const matchesEnvironment = !filters.environment || filters.environment === 'All' || environment === filters.environment;
@@ -160,6 +168,65 @@ function App() {
         return 0;
     }
   });
+
+  const pagination = usePagination(filteredReleases, 10);
+
+  // Reset to page 1 when filters or search change
+  useEffect(() => {
+    pagination.goToFirstPage();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, filters]);
+
+  // Keyboard shortcuts
+  const anyModalOpen = isModalOpen || isDetailsModalOpen || isAuthModalOpen ||
+    isExportModalOpen || isDeleteModalOpen || isShortcutsHelpOpen;
+
+  useKeyboardShortcuts([
+    {
+      key: 'n',
+      description: 'Add new release',
+      action: () => {
+        if (!anyModalOpen) handleAddRelease();
+      },
+    },
+    {
+      key: '/',
+      description: 'Focus search',
+      action: () => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      },
+    },
+    {
+      key: '?',
+      description: 'Show keyboard shortcuts',
+      action: () => setIsShortcutsHelpOpen(prev => !prev),
+    },
+    {
+      key: 'Escape',
+      description: 'Close modal / clear search',
+      allowInInput: true,
+      action: () => {
+        if (isShortcutsHelpOpen) { setIsShortcutsHelpOpen(false); return; }
+        if (isModalOpen) { setIsModalOpen(false); setEditingRelease(null); return; }
+        if (isDetailsModalOpen) { setIsDetailsModalOpen(false); setSelectedRelease(null); return; }
+        if (isAuthModalOpen) { setIsAuthModalOpen(false); return; }
+        if (isExportModalOpen) { setIsExportModalOpen(false); return; }
+        if (isDeleteModalOpen) { setIsDeleteModalOpen(false); setReleaseToDelete(null); return; }
+        if (searchTerm) { setSearchTerm(''); searchInputRef.current?.blur(); }
+      },
+    },
+    {
+      key: 'ArrowLeft',
+      description: 'Previous page',
+      action: () => { if (!anyModalOpen) pagination.goToPrevPage(); },
+    },
+    {
+      key: 'ArrowRight',
+      description: 'Next page',
+      action: () => { if (!anyModalOpen) pagination.goToNextPage(); },
+    },
+  ]);
 
   const handleAddRelease = () => {
     if (isAdmin) {
@@ -294,27 +361,53 @@ function App() {
               </p>
             )}
             <button
+              onClick={() => setIsShortcutsHelpOpen(true)}
+              className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                darkMode
+                  ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                  : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+              }`}
+              title="Keyboard shortcuts (?)"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
+            <button
               onClick={toggleDarkMode}
               className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
-                darkMode 
-                  ? 'text-gray-300 bg-gray-800 hover:bg-gray-700' 
+                darkMode
+                  ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                   : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
               }`}
               title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            {isAdmin && (
+            {user ? (
               <button
                 onClick={handleLogout}
                 className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
-                  darkMode 
-                    ? 'text-gray-300 bg-gray-800 hover:bg-gray-700' 
+                  darkMode
+                    ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                     : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
                 }`}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setAuthAction('sign in');
+                  setIsAuthModalOpen(true);
+                }}
+                className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
+                  darkMode
+                    ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign In
               </button>
             )}
           </div>
@@ -413,6 +506,7 @@ function App() {
           onExportCSV={exportToCSV}
           onExportJSON={exportToJSON}
           darkMode={darkMode}
+          searchRef={searchInputRef}
         />
         
         <div className="flex justify-end mb-6">
@@ -483,22 +577,27 @@ function App() {
         {/* Desktop Table View */}
         {!loading && (
         <div className="hidden lg:block">
-          <ReleaseTable
-            releases={filteredReleases}
-            onEdit={handleEditRelease}
-            onDelete={handleDeleteRelease}
-            onViewDetails={handleViewDetails}
-            isAdmin={isAdmin}
-            onAuthRequired={handleAuthRequired}
-            darkMode={darkMode}
-          />
+          <div className={`rounded-lg border shadow-sm overflow-hidden ${
+            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+          }`}>
+            <ReleaseTable
+              releases={pagination.paginatedItems}
+              onEdit={handleEditRelease}
+              onDelete={handleDeleteRelease}
+              onViewDetails={handleViewDetails}
+              isAdmin={isAdmin}
+              onAuthRequired={handleAuthRequired}
+              darkMode={darkMode}
+            />
+            <Pagination {...pagination} darkMode={darkMode} />
+          </div>
         </div>
         )}
 
         {/* Mobile Card View */}
         {!loading && (
         <div className="lg:hidden space-y-4">
-          {filteredReleases.map((release) => {
+          {pagination.paginatedItems.map((release) => {
             const overallStatus = getOverallStatus(release);
             const statusColors = darkMode ? {
               'Complete': 'bg-green-900/30 text-green-300',
@@ -532,6 +631,13 @@ function App() {
                     }`}>
                       {release.environment || release.concept}
                     </p>
+                    {release.tags && release.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {release.tags.map(tag => (
+                          <TagBadge key={tag} tag={tag} darkMode={darkMode} size="xs" />
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[overallStatus as keyof typeof statusColors]}`}>
                     {overallStatus}
@@ -602,6 +708,10 @@ function App() {
               </div>
             );
           })}
+          {/* Mobile Pagination */}
+          {pagination.totalPages > 1 && (
+            <Pagination {...pagination} darkMode={darkMode} />
+          )}
         </div>
         )}
 
@@ -669,6 +779,12 @@ function App() {
         }}
         onConfirm={handleConfirmDelete}
         release={releaseToDelete}
+        darkMode={darkMode}
+      />
+
+      <KeyboardShortcutsHelp
+        isOpen={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
         darkMode={darkMode}
       />
     </div>

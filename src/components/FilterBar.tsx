@@ -1,7 +1,6 @@
-import React from 'react';
-import { Search, Filter, Calendar, Download } from 'lucide-react';
+import React, { RefObject } from 'react';
+import { Search, Calendar, Download } from 'lucide-react';
 import { FilterOptions } from '../types/release';
-import { ENVIRONMENTS, PLATFORMS } from '../data/mockData';
 
 interface FilterBarProps {
   filters: Partial<FilterOptions>;
@@ -9,8 +8,9 @@ interface FilterBarProps {
   searchTerm: string;
   onSearchChange: (term: string) => void;
   onExportCSV: () => void;
-  onExportJSON: () => void;
+  onExportJSON?: () => void;
   darkMode?: boolean;
+  searchRef?: RefObject<HTMLInputElement>;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -19,8 +19,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   searchTerm,
   onSearchChange,
   onExportCSV,
-  onExportJSON,
   darkMode = false,
+  searchRef,
 }) => {
   return (
     <div className={`rounded-lg shadow-sm border p-4 mb-6 space-y-4 ${
@@ -36,34 +36,35 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               darkMode ? 'text-gray-500' : 'text-gray-400'
             }`} />
             <input
+              ref={searchRef}
               type="text"
-              placeholder="Search by name, environment, version, or build ID..."
+              placeholder="Search by name, environment, version, build ID, or tag..."
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
               className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                darkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400' 
+                darkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400'
                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
               }`}
             />
           </div>
           
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <select
               value={filters.sortBy || 'releaseDate'}
               onChange={(e) => onFiltersChange({ ...filters, sortBy: e.target.value })}
               className={`px-3 py-2 pr-8 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${
-                darkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                darkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-gray-300 text-gray-900'
               }`}
-              style={{ 
-                backgroundImage: darkMode 
+              style={{
+                backgroundImage: darkMode
                   ? 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%239ca3af\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")'
-                  : 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', 
-                backgroundPosition: 'right 0.5rem center', 
-                backgroundRepeat: 'no-repeat', 
-                backgroundSize: '1.5em 1.5em' 
+                  : 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")',
+                backgroundPosition: 'right 0.5rem center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '1.5em 1.5em'
               }}
             >
               <option value="releaseDate">Release Date</option>

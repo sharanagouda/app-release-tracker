@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { Release, PlatformRelease, ConceptRelease } from '../types/release';
 import { ENVIRONMENTS, CONCEPTS, PLATFORMS } from '../data/mockData';
+import { TagInput } from './TagInput';
 
 interface ReleaseModalProps {
   isOpen: boolean;
@@ -49,6 +50,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
     ] as PlatformRelease[],
     changes: [''],
     notes: '',
+    tags: [] as string[],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
@@ -103,6 +105,7 @@ useEffect(() => {
       platforms: convertedPlatforms,
       changes: editingRelease.changes,
       notes: editingRelease.notes || '',
+      tags: editingRelease.tags || [],
       createdAt: editingRelease.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -118,6 +121,7 @@ useEffect(() => {
         ],
         changes: [''],
         notes: '',
+        tags: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -173,6 +177,7 @@ useEffect(() => {
       platforms: convertedPlatforms,
       changes: selected.changes && selected.changes.length > 0 ? selected.changes : [''],
       notes: selected.notes || '',
+      tags: selected.tags || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -1027,11 +1032,28 @@ useEffect(() => {
                 onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 rows={3}
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                  darkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                  darkMode
+                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                     : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                 }`}
                 placeholder="Overall release notes or comments..."
+              />
+            </div>
+
+            {/* Tags / Labels */}
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${
+                darkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
+                Tags / Labels
+                <span className={`ml-2 text-xs font-normal ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  (optional — press Enter or comma to add)
+                </span>
+              </label>
+              <TagInput
+                tags={formData.tags}
+                onChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
+                darkMode={darkMode}
               />
             </div>
 

@@ -41,6 +41,7 @@ export interface Release {
   platforms: PlatformRelease[];
   changes: string[];
   notes?: string;
+  tags?: string[]; // Release tags/labels e.g. ['hotfix', 'critical', 'feature']
   createdAt: string;
   updatedAt: string;
   createdBy?: string; // Email of user who created

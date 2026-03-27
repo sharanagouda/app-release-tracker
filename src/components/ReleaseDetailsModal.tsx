@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Calendar, Package, FileText, Clock, ListChecks, Mail, Share2, Copy, Check } from 'lucide-react';
 import { Release, PlatformRelease, ConceptRelease } from '../types/release';
+import { TagBadge } from './TagInput';
 
 interface ReleaseDetailsModalProps {
   isOpen: boolean;
@@ -398,6 +399,20 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                         {release.environment || release.concept}
                       </span>
                     </div>
+                    {release.tags && release.tags.length > 0 && (
+                      <div className="flex items-start gap-2 mt-2">
+                        <span className={`text-xs sm:text-sm font-medium flex-shrink-0 ${
+                          darkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Tags:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {release.tags.map(tag => (
+                            <TagBadge key={tag} tag={tag} darkMode={darkMode} size="xs" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

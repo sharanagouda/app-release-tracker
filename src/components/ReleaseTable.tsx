@@ -1,6 +1,7 @@
 import React from 'react';
 import { Edit, Trash2, Eye } from 'lucide-react';
 import { Release, PlatformRelease, ConceptRelease } from '../types/release';
+import { TagBadge } from './TagInput';
 
 interface ReleaseTableProps {
   releases: Release[];
@@ -198,6 +199,13 @@ const handleDelete = (release: Release) => {
                     }`}>
                       {new Date(release.releaseDate).toLocaleDateString()}
                     </div>
+                    {release.tags && release.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {release.tags.map((tag) => (
+                          <TagBadge key={tag} tag={tag} darkMode={darkMode} size="xs" />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </td>
                 
