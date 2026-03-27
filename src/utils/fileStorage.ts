@@ -86,24 +86,58 @@ export const importFromJSON = (file: File): Promise<Release[]> => {
 };
 
 export const downloadCSV = (releases: Release[]) => {
+  // Legacy util kept for backward compatibility.
+  // Prefer `exportToCSVFunction()` in [`export.ts`](src/utils/export.ts:1).
   const csvContent = [
-    ['Release Date', 'Release Name', 'Concept', 'Platform', 'Version', 'Build ID', 'Rollout %', 'Status', 'Platform Notes', 'Changes', 'General Notes'],
-    ...releases.flatMap(release =>
-      release.platforms.map(platform => [
-        release.releaseDate,
-        release.releaseName,
-        release.concept,
-        platform.platform,
-        platform.version,
-        platform.buildId,
-        platform.rolloutPercentage.toString(),
-        platform.status,
-        platform.notes || '',
-        release.changes.join('; '),
-        release.notes || ''
-      ])
-    )
-  ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    [
+      'Release Date',
+      'Release Name',
+      'Environment',
+      'Platform',
+      'Concepts',
+      'Version',
+      'Build ID',
+      'Rollout %',
+      'Status',
+      'Platform Notes',
+      'Changes',
+      'General Notes',
+    ],
+    ...releases.flatMap((release) =>
+      release.platforms.flatMap((platform) => {
+        const conceptReleases =
+          platform.conceptReleases && Array.isArray(platform.conceptReleases) && platform.conceptReleases.length > 0
+            ? platform.conceptReleases
+            : [
+                {
+                  concepts: platform.concepts || ['All Concepts'],
+                  version: platform.version || '',
+                  buildId: platform.buildId || '',
+                  rolloutPercentage: platform.rolloutPercentage || 0,
+                  status: platform.status || 'Not Started',
+                  notes: platform.notes || '',
+                },
+              ];
+
+        return conceptReleases.map((cr) => [
+          release.releaseDate,
+          release.releaseName,
+          release.environment || release.concept || '',
+          platform.platform,
+          (cr.concepts || []).join('; '),
+          cr.version || '',
+          cr.buildId || '',
+          String(cr.rolloutPercentage ?? 0),
+          cr.status || '',
+          cr.notes || '',
+          (release.changes || []).join('; '),
+          release.notes || '',
+        ]);
+      })
+    ),
+  ]
+    .map((row) => row.map((cell) => `"${String(cell ?? '')}"`).join(','))
+    .join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);

@@ -1,4 +1,4 @@
-import { Release } from '../types/release';
+import { Release, ReleaseComment } from '../types/release';
 
 /**
  * Safely convert any value to string, avoiding circular references
@@ -12,9 +12,13 @@ const safeStringify = (value: any): string => {
 };
 
 /**
- * Export releases to CSV format
+ * Export releases to CSV format.
+ * Optionally accepts a map of releaseId → comments to include in the export.
  */
-export const exportToCSVFunction = (releases: Release[]): void => {
+export const exportToCSVFunction = (
+  releases: Release[],
+  commentsMap?: Map<string, ReleaseComment[]>
+): void => {
   if (!releases || releases.length === 0) {
     alert('No releases to export');
     return;
@@ -43,6 +47,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
       'Changes',
       'General Notes',
       'Tags',
+      'Comments',
       'Created At',
       'Created By',
       'Updated At',
@@ -61,6 +66,12 @@ export const exportToCSVFunction = (releases: Release[]): void => {
         
         if (conceptReleases.length > 0) {
           // New structure with conceptReleases
+          // Build comments string for this release
+          const releaseComments = commentsMap?.get(release.id) || [];
+          const commentsStr = releaseComments
+            .map(c => `[${c.userName}] ${c.text}`)
+            .join(' | ');
+
           for (let k = 0; k < conceptReleases.length; k++) {
             const cr = conceptReleases[k];
             rows.push([
@@ -82,6 +93,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
               safeStringify(release.changes),
               safeStringify(release.notes),
               safeStringify(release.tags),
+              commentsStr,
               safeStringify(release.createdAt),
               safeStringify(release.createdByName || release.createdBy),
               safeStringify(release.updatedAt),
@@ -90,6 +102,11 @@ export const exportToCSVFunction = (releases: Release[]): void => {
           }
         } else {
           // Legacy structure
+          const releaseCommentsLegacy = commentsMap?.get(release.id) || [];
+          const commentsStrLegacy = releaseCommentsLegacy
+            .map(c => `[${c.userName}] ${c.text}`)
+            .join(' | ');
+
           rows.push([
             safeStringify(release.id),
             safeStringify(release.releaseDate),
@@ -109,6 +126,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
             safeStringify(release.changes),
             safeStringify(release.notes),
             safeStringify(release.tags),
+            commentsStrLegacy,
             safeStringify(release.createdAt),
             safeStringify(release.createdByName || release.createdBy),
             safeStringify(release.updatedAt),

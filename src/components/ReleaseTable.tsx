@@ -1,6 +1,7 @@
 import React from 'react';
 import { Edit, Trash2, Eye } from 'lucide-react';
-import { Release, PlatformRelease, ConceptRelease } from '../types/release';
+import { Release } from '../types/release';
+import { getConceptReleases } from '../utils/conceptReleases';
 import { TagBadge } from './TagInput';
 
 interface ReleaseTableProps {
@@ -9,6 +10,7 @@ interface ReleaseTableProps {
   onDelete: (release: Release) => void;
   onViewDetails: (release: Release) => void;
   isAdmin: boolean;
+  canEdit?: boolean;
   onAuthRequired: (action: string) => void;
   darkMode?: boolean;
 }
@@ -60,25 +62,6 @@ const getStatusBadge = (status: string, darkMode: boolean = false) => {
   }
 };
 
-// Helper to get concept releases from platform (handles both old and new format)
-const getConceptReleases = (platform: PlatformRelease): ConceptRelease[] => {
-  // New format - has conceptReleases array
-  if (platform.conceptReleases && platform.conceptReleases.length > 0) {
-    return platform.conceptReleases;
-  }
-  
-  // Old format - migrate to new format on the fly
-  return [{
-    id: `${platform.platform}-legacy`,
-    concepts: platform.concepts || ['All Concepts'],
-    version: platform.version || '',
-    buildId: platform.buildId || '',
-    rolloutPercentage: platform.rolloutPercentage || 0,
-    status: platform.status || 'Not Started',
-    notes: platform.notes || '',
-    buildLink: platform.buildLink || ''
-  }];
-};
 
 export const ReleaseTable: React.FC<ReleaseTableProps> = ({
   releases,
@@ -86,11 +69,12 @@ export const ReleaseTable: React.FC<ReleaseTableProps> = ({
   onDelete,
   onViewDetails,
   isAdmin,
+  canEdit = false,
   onAuthRequired,
   darkMode = false
 }) => {
 const handleEdit = (release: Release) => {
-  if (isAdmin) {
+  if (canEdit) {
     onEdit(release);
   } else {
     onAuthRequired('edit this release');
@@ -361,7 +345,7 @@ const handleDelete = (release: Release) => {
                     <button
                       onClick={() => handleEdit(release)}
                       className={`p-1 rounded transition-colors ${
-                        isAdmin 
+                        canEdit
                           ? darkMode
                             ? 'text-green-400 hover:text-green-300 hover:bg-green-900/30'
                             : 'text-green-600 hover:text-green-800 hover:bg-green-50'
@@ -369,7 +353,7 @@ const handleDelete = (release: Release) => {
                             ? 'text-gray-600 cursor-not-allowed'
                             : 'text-gray-400 cursor-not-allowed'
                       }`}
-                      title={isAdmin ? "Edit Release" : "Admin access required"}
+                      title={canEdit ? "Edit Release" : "Editor access required"}
                     >
                       <Edit className="w-4 h-4" />
                     </button>

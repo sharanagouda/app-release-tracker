@@ -1,0 +1,70 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function userRole() {
+      return signedIn() && userDoc(request.auth.uid).data.role != null
+        ? userDoc(request.auth.uid).data.role
+        : 'viewer';
+    }
+
+    function isAdmin() {
+      return userRole() == 'admin';
+    }
+
+    function isEditorOrAdmin() {
+      return userRole() == 'admin' || userRole() == 'editor';
+    }
+
+    // Releases
+    match /releases/{releaseId} {
+      allow read: if true;
+      allow create: if signedIn() && isEditorOrAdmin();
+      allow update: if signedIn() && isEditorOrAdmin();
+      allow delete: if signedIn() && isAdmin();
+    }
+
+    // Activity logs (write when actions happen)
+    match /activityLogs/{logId} {
+      allow read: if true;
+      allow create: if signedIn() && isEditorOrAdmin();
+      allow update, delete: if false;
+    }
+
+    // Comments (only author can edit/delete)
+    match /releaseComments/{commentId} {
+      allow read: if true;
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && resource.data.userEmail == request.auth.token.email;
+    }
+
+    // Users RBAC profiles
+    match /users/{uid} {
+      allow read: if signedIn();
+      // Allow user to create their own profile (client bootstrap)
+      allow create: if signedIn() && request.auth.uid == uid;
+      // Allow user to update non-role fields in their own doc
+      allow update: if signedIn() && request.auth.uid == uid
+        && !(request.resource.data.diff(resource.data).changedKeys().hasAny(['role']));
+      // Admin can update roles and manage any profile
+      allow update: if signedIn() && isAdmin();
+      allow delete: if false;
+    }
+
+    // Access requests
+    match /accessRequests/{requestId} {
+      allow read: if signedIn() && isAdmin();
+      allow create: if signedIn();
+      allow update: if signedIn() && isAdmin();
+      allow delete: if false;
+    }
+  }
+}

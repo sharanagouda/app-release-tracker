@@ -4,7 +4,8 @@ export type ActivityAction =
   | 'deleted'
   | 'rollout_updated'
   | 'status_changed'
-  | 'tags_updated';
+  | 'tags_updated'
+  | 'commented';
 
 export interface ActivityLogEntry {
   id: string;
@@ -83,6 +84,17 @@ export interface ReleaseStats {
   activeReleases: number;
   completedReleases: number;
   pausedReleases: number;
+}
+
+export interface ReleaseComment {
+  id: string;
+  releaseId: string;
+  text: string;
+  userEmail: string;
+  userName: string;
+  createdAt: string; // ISO string
+  updatedAt?: string; // ISO string, set when edited
+  edited?: boolean;
 }
 
 export interface FilterOptions {

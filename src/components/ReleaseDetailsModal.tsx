@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, Calendar, Package, FileText, Clock, ListChecks, Mail, Share2, Copy, Check, Activity } from 'lucide-react';
-import { Release, PlatformRelease, ConceptRelease } from '../types/release';
+import { ConceptRelease, Release } from '../types/release';
+import { getConceptReleases } from '../utils/conceptReleases';
 import { TagBadge } from './TagInput';
+import { CommentsSection } from './CommentsSection';
 
 interface ReleaseDetailsModalProps {
   isOpen: boolean;
@@ -9,8 +11,11 @@ interface ReleaseDetailsModalProps {
   release: Release | null;
   darkMode?: boolean;
   currentUserEmail?: string;
+  isAdmin?: boolean;
   /** Called when the user clicks the Activity Log button */
   onViewActivityLog?: (release: Release) => void;
+  /** Called when user tries an action they don't have permission for (shows PermissionDeniedModal) */
+  onRequestPermission?: (action: string) => void;
 }
 
 const getStatusColor = (status: ConceptRelease['status'], darkMode: boolean = false) => {
@@ -46,25 +51,6 @@ const getRolloutColor = (percentage: number) => {
   return 'bg-green-400';
 };
 
-// Helper to get concept releases from platform (handles both old and new format)
-const getConceptReleases = (platform: PlatformRelease): ConceptRelease[] => {
-  if (platform.conceptReleases && platform.conceptReleases.length > 0) {
-    return platform.conceptReleases;
-  }
-  
-  // Old format - migrate on the fly
-  return [{
-    id: `${platform.platform}-legacy`,
-    concepts: platform.concepts || ['All Concepts'],
-    version: platform.version || '',
-    buildId: platform.buildId || '',
-    rolloutPercentage: platform.rolloutPercentage || 0,
-    status: platform.status || 'Not Started',
-    notes: platform.notes || '',
-    buildLink: platform.buildLink || '',
-    rolloutHistory: platform.rolloutHistory || []
-  }];
-};
 
 // Generate a plain-text email body from a release
 const generateEmailContent = (release: Release): { subject: string; body: string } => {
@@ -132,8 +118,10 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
   onClose,
   release,
   darkMode = false,
-  currentUserEmail = 'user@example.com',
+  currentUserEmail,
+  isAdmin = false,
   onViewActivityLog,
+  onRequestPermission,
 }) => {
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [showTeamsShare, setShowTeamsShare] = useState(false);
@@ -906,6 +894,17 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Comments / Discussion Thread */}
+          <div className="mt-6">
+            <CommentsSection
+              releaseId={release.id}
+              releaseName={release.releaseName}
+              darkMode={darkMode}
+              currentUserEmail={currentUserEmail}
+              onRequestPermission={onRequestPermission}
+            />
+          </div>
         </div>
       </div>
 
