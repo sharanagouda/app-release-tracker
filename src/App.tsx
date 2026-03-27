@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun, Keyboard, LogIn } from 'lucide-react';
-import { Release, FilterOptions } from './types/release';
+import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun, Keyboard, LogIn, Shield } from 'lucide-react';
+import { FilterOptions, Release } from './types/release';
+import { getConceptReleases } from './utils/conceptReleases';
 import { exportToCSVFunction, exportToJSONFunction } from './utils/export';
 import { useReleases } from './hooks/useReleases';
 import { usePagination } from './hooks/usePagination';
@@ -19,6 +20,9 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { TagBadge } from './components/TagInput';
 import { onAuthChange, logout } from './services/firebaseAuth';
 import { User } from 'firebase/auth';
+import { ensureUserProfile, subscribeToUserRole, UserRole } from './services/firebaseUsers';
+import { AdminPanel } from './components/AdminPanel';
+import { PermissionDeniedModal } from './components/PermissionDeniedModal';
 
 function App() {
   const { releases, loading, saving, saveError, addRelease, updateRelease, deleteRelease } = useReleases();
@@ -28,7 +32,10 @@ function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportType, setExportType] = useState<'CSV' | 'JSON'>('CSV');
   const [authAction, setAuthAction] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole>('viewer');
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isPermissionDeniedOpen, setIsPermissionDeniedOpen] = useState(false);
+  const [permissionDeniedAction, setPermissionDeniedAction] = useState('');
   const [darkMode, setDarkMode] = useState(false);
   const [editingRelease, setEditingRelease] = useState<Release | null>(null);
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
@@ -42,12 +49,40 @@ function App() {
   const [activityLogRelease, setActivityLogRelease] = useState<Release | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  const isAdmin = userRole === 'admin';
+  const canEdit = userRole === 'admin' || userRole === 'editor';
+
   useEffect(() => {
-    const unsubscribe = onAuthChange((authUser) => {
-      setIsAdmin(!!authUser);
+    let roleUnsubscribe: (() => void) | undefined;
+
+    const unsubscribe = onAuthChange(async (authUser) => {
       setUser(authUser);
+      
+      if (authUser) {
+        try {
+          // Ensure user profile exists in Firestore
+          await ensureUserProfile(authUser.uid, authUser.email || '');
+          
+          // Subscribe to role changes
+          roleUnsubscribe = subscribeToUserRole(authUser.uid, (role) => {
+            setUserRole(role);
+          });
+        } catch (error) {
+          console.error('Error setting up user profile:', error);
+        }
+      } else {
+        setUserRole('viewer');
+        if (roleUnsubscribe) {
+          roleUnsubscribe();
+          roleUnsubscribe = undefined;
+        }
+      }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      if (roleUnsubscribe) roleUnsubscribe();
+    };
   }, []);
 
   // Load dark mode preference from localStorage
@@ -66,7 +101,7 @@ function App() {
 
   const handleLogout = async () => {
     await logout();
-    setIsAdmin(false);
+    setUserRole('viewer');
     setUser(null);
   };
 
@@ -81,23 +116,6 @@ function App() {
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
-  };
-
-  const getConceptReleases = (platform: any) => {
-    if (platform.conceptReleases && platform.conceptReleases.length > 0) {
-      return platform.conceptReleases;
-    }
-    
-    return [{
-      id: `${platform.platform}-legacy`,
-      concepts: platform.concepts || ['All Concepts'],
-      version: platform.version || '',
-      buildId: platform.buildId || '',
-      rolloutPercentage: platform.rolloutPercentage || 0,
-      status: platform.status || 'Not Started',
-      notes: platform.notes || '',
-      buildLink: platform.buildLink || ''
-    }];
   };
 
   const getOverallStatus = (release: Release) => {
@@ -178,8 +196,7 @@ function App() {
   // Reset to page 1 when filters or search change
   useEffect(() => {
     pagination.goToFirstPage();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filters]);
+  }, [pagination, searchTerm, filters]);
 
   // Keyboard shortcuts
   const anyModalOpen = isModalOpen || isDetailsModalOpen || isAuthModalOpen ||
@@ -234,9 +251,12 @@ function App() {
   ]);
 
   const handleAddRelease = () => {
-    if (isAdmin) {
+    if (canEdit) {
       setEditingRelease(null);
       setIsModalOpen(true);
+    } else if (user) {
+      setPermissionDeniedAction('add releases');
+      setIsPermissionDeniedOpen(true);
     } else {
       setAuthAction('add a new release');
       setIsAuthModalOpen(true);
@@ -244,9 +264,12 @@ function App() {
   };
 
   const handleEditRelease = (release: Release) => {
-    if (isAdmin) {
+    if (canEdit) {
       setEditingRelease(release);
       setIsModalOpen(true);
+    } else if (user) {
+      setPermissionDeniedAction('edit releases');
+      setIsPermissionDeniedOpen(true);
     } else {
       setAuthAction('edit this release');
       setIsAuthModalOpen(true);
@@ -255,9 +278,11 @@ function App() {
 
   const handleDeleteRelease = (release: Release) => {
     if (isAdmin) {
-      console.log("----", release)
       setReleaseToDelete(release);
       setIsDeleteModalOpen(true);
+    } else if (user) {
+      setPermissionDeniedAction('delete releases');
+      setIsPermissionDeniedOpen(true);
     } else {
       setAuthAction('delete this release');
       setIsAuthModalOpen(true);
@@ -299,8 +324,15 @@ function App() {
     }
   };
 
-  const handleAuthRequired = () => {
-    setAuthAction('edit or delete a release');
+  const handleAuthRequired = (action?: string) => {
+    // If user is signed in but lacks permission, show request-access flow instead of sign-in.
+    if (user?.email) {
+      setPermissionDeniedAction(action ?? 'edit or delete a release');
+      setIsPermissionDeniedOpen(true);
+      return;
+    }
+
+    setAuthAction(action ?? 'edit or delete a release');
     setIsAuthModalOpen(true);
   };
 
@@ -315,9 +347,8 @@ function App() {
       setIsExportModalOpen(true);
       return;
     }
-    
+
     exportToCSVFunction(filteredReleases);
-    console.log('Exporting to CSV...');
   };
 
   const exportToJSON = () => {
@@ -327,18 +358,15 @@ function App() {
       setIsExportModalOpen(true);
       return;
     }
-    
+
     exportToJSONFunction(filteredReleases);
-    console.log('Exporting to JSON...');
   };
 
   const handleConfirmExport = () => {
     if (exportType === 'CSV') {
       exportToCSVFunction(releases);
-      console.log('Exporting all data to CSV...');
     } else {
       exportToJSONFunction(releases);
-      console.log('Exporting all data to JSON...');
     }
   };
 
@@ -393,17 +421,33 @@ function App() {
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
             {user ? (
-              <button
-                onClick={handleLogout}
-                className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
-                  darkMode
-                    ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
-                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </button>
+              <>
+                {isAdmin && (
+                  <button
+                    onClick={() => setIsAdminPanelOpen(true)}
+                    className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                      darkMode
+                        ? 'text-purple-300 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700'
+                        : 'text-purple-700 bg-purple-100 hover:bg-purple-200 border border-purple-200'
+                    }`}
+                    title="Admin Panel"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Admin
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
+                    darkMode
+                      ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                      : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                  }`}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </button>
+              </>
             ) : (
               <button
                 onClick={() => {
@@ -596,6 +640,7 @@ function App() {
               onDelete={handleDeleteRelease}
               onViewDetails={handleViewDetails}
               isAdmin={isAdmin}
+              canEdit={canEdit}
               onAuthRequired={handleAuthRequired}
               darkMode={darkMode}
             />
@@ -763,7 +808,21 @@ function App() {
         }}
         release={selectedRelease}
         darkMode={darkMode}
+        currentUserEmail={user?.email || undefined}
+        isAdmin={isAdmin}
         onViewActivityLog={handleViewActivityLog}
+        onRequestPermission={(action) => {
+          // If the user is not signed in, show the AuthModal.
+          // If the user is signed in but lacks permission, show PermissionDeniedModal.
+          if (!user?.email) {
+            setAuthAction(action);
+            setIsAuthModalOpen(true);
+            return;
+          }
+
+          setPermissionDeniedAction(action);
+          setIsPermissionDeniedOpen(true);
+        }}
       />
 
       <AuthModal
@@ -808,6 +867,21 @@ function App() {
         releaseId={activityLogRelease?.id ?? ''}
         releaseName={activityLogRelease?.releaseName ?? ''}
         darkMode={darkMode}
+      />
+
+      <AdminPanel
+        isOpen={isAdminPanelOpen}
+        onClose={() => setIsAdminPanelOpen(false)}
+        darkMode={darkMode}
+        currentUserUid={user?.uid}
+      />
+
+      <PermissionDeniedModal
+        isOpen={isPermissionDeniedOpen}
+        onClose={() => setIsPermissionDeniedOpen(false)}
+        user={user ? { uid: user.uid, email: user.email, displayName: getDisplayName(user) } : null}
+        darkMode={darkMode}
+        action={permissionDeniedAction}
       />
     </div>
   );

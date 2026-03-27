@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  MessageCircle,
 } from 'lucide-react';
 import { ActivityLogEntry, ActivityAction } from '../types/release';
 import { getActivityLogsForRelease, formatActivityTimestamp } from '../services/firebaseActivityLog';
@@ -82,6 +83,12 @@ const ACTION_META: Record<
     icon: <Tag className="w-4 h-4" />,
     colorLight: 'bg-teal-100 text-teal-700 border-teal-200',
     colorDark: 'bg-teal-900/30 text-teal-300 border-teal-700',
+  },
+  commented: {
+    label: 'Comment',
+    icon: <MessageCircle className="w-4 h-4" />,
+    colorLight: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    colorDark: 'bg-indigo-900/30 text-indigo-300 border-indigo-700',
   },
 };
 

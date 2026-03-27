@@ -9,6 +9,8 @@ import {
   query,
   orderBy,
   where,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Release, RolloutHistoryEntry } from '../types/release';
@@ -299,6 +301,35 @@ export const getReleases = async (): Promise<Release[]> => {
     id: doc.id,
     ...doc.data(),
   } as Release));
+};
+
+/**
+ * Subscribe to real-time updates on the releases collection.
+ * Returns an unsubscribe function that should be called on cleanup.
+ */
+export const subscribeToReleases = (
+  onData: (releases: Release[]) => void,
+  onError: (error: Error) => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, RELEASES_COLLECTION),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const releases = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Release));
+      onData(releases);
+    },
+    (error) => {
+      console.error('Firestore onSnapshot error:', error);
+      onError(error);
+    }
+  );
 };
 
 // New function to update rollout percentage with history tracking
