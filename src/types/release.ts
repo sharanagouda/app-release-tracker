@@ -16,6 +16,7 @@ export interface ConceptRelease {
   notes?: string;
   buildLink?: string;
   rolloutHistory?: RolloutHistoryEntry[];
+  versionChanges?: string[]; // Version-specific changes/what's new in this version
 }
 
 export interface PlatformRelease {

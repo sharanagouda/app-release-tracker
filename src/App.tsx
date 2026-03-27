@@ -566,6 +566,7 @@ function App() {
         onSave={handleSaveRelease}
         editingRelease={editingRelease}
         darkMode={darkMode}
+        releases={releases}
       />
 
       <ReleaseDetailsModal

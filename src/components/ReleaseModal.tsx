@@ -9,6 +9,7 @@ interface ReleaseModalProps {
   onSave: (release: Omit<Release, 'id'>) => void;
   editingRelease?: Release | null;
   darkMode?: boolean;
+  releases?: Release[];
 }
 
 const initialConceptRelease: ConceptRelease = {
@@ -33,7 +34,10 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
   onSave,
   editingRelease,
   darkMode = false,
+  releases = [],
 }) => {
+  const [loadedFromRelease, setLoadedFromRelease] = useState<Release | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [formData, setFormData] = useState({
     releaseDate: '',
     releaseName: '',
@@ -50,6 +54,9 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
   });
 
 useEffect(() => {
+  // Reset load state when modal opens/closes
+  setLoadedFromRelease(null);
+  setLoadError('');
   if (editingRelease) {
     // Convert old format to new format if needed
     const convertedPlatforms = editingRelease.platforms.map(p => {
@@ -66,6 +73,7 @@ useEffect(() => {
             status: cr.status,
             notes: cr.notes || '',
             buildLink: cr.buildLink || '',
+            ...(cr.versionChanges && cr.versionChanges.length > 0 ? { versionChanges: cr.versionChanges } : {}),
             // Don't include rolloutHistory here - it will be managed by updateRelease
           }))
         };
@@ -116,14 +124,116 @@ useEffect(() => {
     }
   }, [editingRelease, isOpen]);
 
+  const handleLoadPreviousRelease = (releaseId: string) => {
+    if (!releaseId) {
+      setLoadedFromRelease(null);
+      setLoadError('');
+      return;
+    }
+    const selected = releases.find(r => r.id === releaseId);
+    if (!selected) return;
+
+    // Convert platforms to form-compatible format (strip rolloutHistory)
+    const convertedPlatforms = selected.platforms.map(p => {
+      if (p.conceptReleases && Array.isArray(p.conceptReleases)) {
+        return {
+          ...p,
+          conceptReleases: p.conceptReleases.map(cr => ({
+            id: cr.id,
+            concepts: cr.concepts,
+            version: cr.version,
+            buildId: cr.buildId,
+            rolloutPercentage: cr.rolloutPercentage,
+            status: cr.status,
+            notes: cr.notes || '',
+            buildLink: cr.buildLink || '',
+            ...(cr.versionChanges && cr.versionChanges.length > 0 ? { versionChanges: cr.versionChanges } : {}),
+          }))
+        };
+      }
+      return {
+        platform: p.platform,
+        conceptReleases: [{
+          id: `${p.platform.toLowerCase().replace(/\s+/g, '-')}-1`,
+          concepts: p.concepts || ['All Concepts'],
+          version: p.version || '',
+          buildId: p.buildId || '',
+          rolloutPercentage: p.rolloutPercentage || 0,
+          status: p.status || 'Not Started',
+          notes: p.notes || '',
+          buildLink: p.buildLink || '',
+        }]
+      };
+    });
+
+    setFormData({
+      releaseDate: selected.releaseDate,
+      releaseName: selected.releaseName,
+      environment: selected.environment || selected.concept || '',
+      platforms: convertedPlatforms,
+      changes: selected.changes && selected.changes.length > 0 ? selected.changes : [''],
+      notes: selected.notes || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    setLoadedFromRelease(selected);
+    setLoadError('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setLoadError('');
+
+    // If form was loaded from a previous release, check that at least one field has changed
+    if (loadedFromRelease && !editingRelease) {
+      const source = loadedFromRelease;
+      const sourcePlatformData = JSON.stringify(
+        source.platforms.map(p => ({
+          platform: p.platform,
+          conceptReleases: (p.conceptReleases || []).map(cr => ({
+            version: cr.version,
+            buildId: cr.buildId,
+            rolloutPercentage: cr.rolloutPercentage,
+            status: cr.status,
+            concepts: [...(cr.concepts || [])].sort(),
+          }))
+        }))
+      );
+      const currentPlatformData = JSON.stringify(
+        formData.platforms.map(p => ({
+          platform: p.platform,
+          conceptReleases: (p.conceptReleases || []).map(cr => ({
+            version: cr.version,
+            buildId: cr.buildId,
+            rolloutPercentage: cr.rolloutPercentage,
+            status: cr.status,
+            concepts: [...(cr.concepts || [])].sort(),
+          }))
+        }))
+      );
+
+      const unchanged =
+        formData.releaseName === source.releaseName &&
+        formData.releaseDate === source.releaseDate &&
+        formData.environment === (source.environment || source.concept || '') &&
+        formData.notes === (source.notes || '') &&
+        sourcePlatformData === currentPlatformData;
+
+      if (unchanged) {
+        setLoadError('Please modify at least one field before saving. The form data is identical to the loaded release.');
+        return;
+      }
+    }
+
     const filteredChanges = formData.changes.filter(change => change.trim() !== '');
     
-    // Filter out platforms with no valid concept releases
+    // Filter out platforms with no valid concept releases, and clean up versionChanges
     const validPlatforms = formData.platforms.map(p => ({
       ...p,
-      conceptReleases: (p.conceptReleases || []).filter(cr => cr.version && cr.buildId)
+      conceptReleases: (p.conceptReleases || []).filter(cr => cr.version && cr.buildId).map(cr => ({
+        ...cr,
+        versionChanges: (cr.versionChanges || []).filter(vc => vc.trim() !== '')
+      }))
     })).filter(p => p.conceptReleases && p.conceptReleases.length > 0);
     
     onSave({
@@ -146,11 +256,17 @@ useEffect(() => {
       
       const newId = `${platform.platform.toLowerCase().replace(/\s+/g, '-')}-${platform.conceptReleases.length + 1}`;
       
+      // When adding a new version, ensure all existing versions also get versionChanges field
+      const existingWithChanges = platform.conceptReleases.map(cr => ({
+        ...cr,
+        versionChanges: cr.versionChanges && cr.versionChanges.length > 0 ? cr.versionChanges : ['']
+      }));
+      
       updatedPlatforms[platformIndex] = {
         ...platform,
         conceptReleases: [
-          ...platform.conceptReleases,
-          { ...initialConceptRelease, id: newId }
+          ...existingWithChanges,
+          { ...initialConceptRelease, id: newId, versionChanges: [''] }
         ]
       };
       
@@ -205,6 +321,13 @@ useEffect(() => {
     }));
   };
 
+  const removePlatform = (platformIndex: number) => {
+    setFormData(prev => ({
+      ...prev,
+      platforms: prev.platforms.filter((_, i) => i !== platformIndex),
+    }));
+  };
+
   const addChange = () => {
     setFormData(prev => ({
       ...prev,
@@ -237,6 +360,77 @@ useEffect(() => {
           if (nextInput) {
             nextInput.focus();
           }
+        }, 50);
+      }
+    }
+  };
+
+  const addVersionChange = (platformIndex: number, conceptIndex: number) => {
+    setFormData(prev => ({
+      ...prev,
+      platforms: prev.platforms.map((platform, pIdx) => {
+        if (pIdx !== platformIndex || !platform.conceptReleases) return platform;
+        return {
+          ...platform,
+          conceptReleases: platform.conceptReleases.map((cr, cIdx) => {
+            if (cIdx !== conceptIndex) return cr;
+            return { ...cr, versionChanges: [...(cr.versionChanges || ['']), ''] };
+          })
+        };
+      })
+    }));
+  };
+
+  const removeVersionChange = (platformIndex: number, conceptIndex: number, changeIndex: number) => {
+    setFormData(prev => ({
+      ...prev,
+      platforms: prev.platforms.map((platform, pIdx) => {
+        if (pIdx !== platformIndex || !platform.conceptReleases) return platform;
+        return {
+          ...platform,
+          conceptReleases: platform.conceptReleases.map((cr, cIdx) => {
+            if (cIdx !== conceptIndex) return cr;
+            return { ...cr, versionChanges: (cr.versionChanges || []).filter((_, i) => i !== changeIndex) };
+          })
+        };
+      })
+    }));
+  };
+
+  const updateVersionChange = (platformIndex: number, conceptIndex: number, changeIndex: number, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      platforms: prev.platforms.map((platform, pIdx) => {
+        if (pIdx !== platformIndex || !platform.conceptReleases) return platform;
+        return {
+          ...platform,
+          conceptReleases: platform.conceptReleases.map((cr, cIdx) => {
+            if (cIdx !== conceptIndex) return cr;
+            return {
+              ...cr,
+              versionChanges: (cr.versionChanges || []).map((ch, i) => i === changeIndex ? value : ch)
+            };
+          })
+        };
+      })
+    }));
+  };
+
+  const handleVersionChangeKeyPress = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    platformIndex: number,
+    conceptIndex: number,
+    changeIndex: number
+  ) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const currentChanges = formData.platforms[platformIndex]?.conceptReleases?.[conceptIndex]?.versionChanges || [];
+      if (currentChanges[changeIndex]?.trim() !== '') {
+        addVersionChange(platformIndex, conceptIndex);
+        setTimeout(() => {
+          const inputs = document.querySelectorAll(`[data-version-change="${platformIndex}-${conceptIndex}"]`);
+          const nextInput = inputs[changeIndex + 1] as HTMLInputElement;
+          if (nextInput) nextInput.focus();
         }, 50);
       }
     }
@@ -293,28 +487,92 @@ useEffect(() => {
       <div className={`rounded-lg shadow-xl w-full max-w-6xl my-4 ${
         darkMode ? 'bg-gray-800' : 'bg-white'
       }`}>
-        <div className={`flex items-center justify-between p-4 sm:p-6 border-b sticky top-0 z-10 ${
+        <div className={`sticky top-0 z-10 border-b ${
           darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
         }`}>
-          <h2 className={`text-lg sm:text-xl font-semibold ${
-            darkMode ? 'text-white' : 'text-gray-900'
-          }`}>
-            {editingRelease ? 'Edit Release' : 'Add New Release'}
-          </h2>
-          <button
-            onClick={onClose}
-            className={`p-1 rounded-lg transition-colors ${
-              darkMode 
-                ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' 
-                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <X className="h-5 w-5 sm:h-6 sm:w-6" />
-          </button>
+          {/* Row 1: Title, Load Previous Release dropdown, Close button */}
+          <div className="flex items-center justify-between p-4 sm:p-6 gap-3">
+            <h2 className={`text-lg sm:text-xl font-semibold flex-shrink-0 ${
+              darkMode ? 'text-white' : 'text-gray-900'
+            }`}>
+              {editingRelease ? 'Edit Release' : 'Add New Release'}
+            </h2>
+
+            <div className="flex items-center gap-3">
+              {!editingRelease && releases.length > 0 && (
+                <div className="relative">
+                  <select
+                    defaultValue=""
+                    onChange={(e) => handleLoadPreviousRelease(e.target.value)}
+                    className={`w-full sm:w-64 pl-3 pr-8 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none ${
+                      darkMode
+                        ? 'bg-gray-700 border-gray-600 text-gray-200'
+                        : 'bg-white border-gray-300 text-gray-700'
+                    }`}
+                    style={{
+                      backgroundImage: darkMode
+                        ? 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%239ca3af\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")'
+                        : 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")',
+                      backgroundPosition: 'right 0.5rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.5em 1.5em',
+                    }}
+                  >
+                    <option value="">Load previous release...</option>
+                    {releases.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.releaseName} — {r.releaseDate} ({r.environment || r.concept || ''})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button
+                onClick={onClose}
+                className={`p-1 rounded-lg transition-colors flex-shrink-0 ${
+                  darkMode
+                    ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700'
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Banners (Pre-filled info & error messages) */}
+          {(loadedFromRelease && !editingRelease || loadError) && (
+            <div className={`px-4 sm:px-6 pb-3 space-y-2 ${
+              darkMode ? 'bg-gray-800' : 'bg-white'
+            }`}>
+              {/* Loaded-from banner */}
+              {loadedFromRelease && !editingRelease && (
+                <div className={`flex items-start gap-2 px-3 py-2 rounded-lg text-sm ${
+                  darkMode ? 'bg-blue-900/30 text-blue-300 border border-blue-700' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                }`}>
+                  <span className="mt-0.5">📋</span>
+                  <span>
+                    Pre-filled from <strong>{loadedFromRelease.releaseName}</strong>. Modify the fields as needed before saving.
+                  </span>
+                </div>
+              )}
+
+              {/* Duplicate-data error */}
+              {loadError && (
+                <div className={`flex items-start gap-2 px-3 py-2 rounded-lg text-sm ${
+                  darkMode ? 'bg-red-900/30 text-red-300 border border-red-700' : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  <span className="mt-0.5">⚠️</span>
+                  <span>{loadError}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="max-h-[calc(90vh-8rem)] overflow-y-auto">
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
+
             {/* Basic Release Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               <div>
@@ -401,11 +659,28 @@ useEffect(() => {
                     darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
                   }`}>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-                      <h4 className={`font-semibold text-base sm:text-lg ${
-                        darkMode ? 'text-white' : 'text-gray-900'
-                      }`}>
-                        {platform.platform}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className={`font-semibold text-base sm:text-lg ${
+                          darkMode ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {platform.platform}
+                        </h4>
+                        {/* Delete platform — only shown when more than 1 platform exists */}
+                        {formData.platforms.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removePlatform(platformIndex)}
+                            className={`p-1 rounded transition-colors ${
+                              darkMode
+                                ? 'text-red-400 hover:text-red-300 hover:bg-red-900/30'
+                                : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                            }`}
+                            title={`Remove ${platform.platform} platform`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => addConceptRelease(platformIndex)}
@@ -627,6 +902,66 @@ useEffect(() => {
                               placeholder="https://sharepoint.com/builds/..."
                             />
                           </div>
+
+                          {/* Version-specific Changes — only shown when multiple release versions exist */}
+                          {platform.conceptReleases && platform.conceptReleases.length > 1 && (
+                          <div className="mt-3">
+                            <label className={`block text-sm font-medium mb-1 ${
+                              darkMode ? 'text-gray-300' : 'text-gray-700'
+                            }`}>
+                              Version Changes
+                              <span className={`ml-1 text-xs font-normal ${
+                                darkMode ? 'text-gray-400' : 'text-gray-500'
+                              }`}>
+                                (What's new in this version)
+                              </span>
+                            </label>
+                            <div className="space-y-2">
+                              {(conceptRelease.versionChanges || ['']).map((vChange, vIdx) => (
+                                <div key={vIdx} className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    data-version-change={`${platformIndex}-${conceptIndex}`}
+                                    value={vChange}
+                                    onChange={(e) => updateVersionChange(platformIndex, conceptIndex, vIdx, e.target.value)}
+                                    onKeyPress={(e) => handleVersionChangeKeyPress(e, platformIndex, conceptIndex, vIdx)}
+                                    className={`flex-1 px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                      darkMode 
+                                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                                    }`}
+                                    placeholder="e.g., Fixed checkout crash on iOS 17..."
+                                  />
+                                  {(conceptRelease.versionChanges || ['']).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVersionChange(platformIndex, conceptIndex, vIdx)}
+                                      className={`transition-colors flex-shrink-0 ${
+                                        darkMode 
+                                          ? 'text-red-400 hover:text-red-300' 
+                                          : 'text-red-600 hover:text-red-800'
+                                      }`}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => addVersionChange(platformIndex, conceptIndex)}
+                                className={`flex items-center gap-1 text-xs transition-colors ${
+                                  darkMode 
+                                    ? 'text-blue-400 hover:text-blue-300' 
+                                    : 'text-blue-600 hover:text-blue-800'
+                                }`}
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add Version Change
+                              </button>
+                            </div>
+                          </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -707,17 +1042,17 @@ useEffect(() => {
               />
             </div>
 
-            <div className={`flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t sticky bottom-0 ${
-              darkMode 
-                ? 'border-gray-700 bg-gray-800' 
+            <div className={`flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 pb-4 border-t sticky bottom-0 ${
+              darkMode
+                ? 'border-gray-700 bg-gray-800'
                 : 'border-gray-200 bg-white'
             }`}>
               <button
                 type="button"
                 onClick={onClose}
                 className={`w-full sm:w-auto px-4 py-2 rounded-lg transition-colors ${
-                  darkMode 
-                    ? 'text-gray-300 bg-gray-700 hover:bg-gray-600' 
+                  darkMode
+                    ? 'text-gray-300 bg-gray-700 hover:bg-gray-600'
                     : 'text-gray-700 bg-gray-200 hover:bg-gray-300'
                 }`}
               >

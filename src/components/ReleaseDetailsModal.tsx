@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Calendar, Package, FileText, Clock } from 'lucide-react';
+import { X, Calendar, Package, FileText, Clock, ListChecks } from 'lucide-react';
 import { Release, PlatformRelease, ConceptRelease } from '../types/release';
 
 interface ReleaseDetailsModalProps {
@@ -452,6 +452,40 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                                   </a>
                                 </div>
                               )}
+
+                              {/* Version-specific Changes */}
+                              {conceptRelease.versionChanges && conceptRelease.versionChanges.length > 0 && (
+                                <div className="mt-3 sm:mt-4">
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <ListChecks className={`h-3.5 w-3.5 ${
+                                      darkMode ? 'text-emerald-400' : 'text-emerald-600'
+                                    }`} />
+                                    <span className={`text-xs sm:text-sm font-medium ${
+                                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                                    }`}>
+                                      Version Changes
+                                    </span>
+                                  </div>
+                                  <div className={`rounded-lg p-2.5 ${
+                                    darkMode ? 'bg-emerald-900/20 border border-emerald-800/40' : 'bg-emerald-50 border border-emerald-200'
+                                  }`}>
+                                    <ul className="space-y-1.5">
+                                      {conceptRelease.versionChanges.map((vc, vcIdx) => (
+                                        <li key={vcIdx} className="flex items-start gap-2">
+                                          <div className={`h-1.5 w-1.5 rounded-full mt-1.5 flex-shrink-0 ${
+                                            darkMode ? 'bg-emerald-400' : 'bg-emerald-500'
+                                          }`} />
+                                          <span className={`text-xs sm:text-sm ${
+                                            darkMode ? 'text-emerald-200' : 'text-emerald-800'
+                                          }`}>
+                                            {vc}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -466,7 +500,7 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                           </h5>
                           
                           {conceptRelease.rolloutHistory && conceptRelease.rolloutHistory.length > 0 ? (
-                            <div className="space-y-2">
+                            <div className={`space-y-2 ${conceptRelease.rolloutHistory.length > 5 ? 'max-h-[280px] overflow-y-auto pr-1' : ''}`}>
                               {conceptRelease.rolloutHistory.map((entry, historyIndex) => (
                                 <div key={historyIndex} className={`rounded px-2 sm:px-3 py-2 ${
                                   darkMode ? 'bg-gray-800' : 'bg-white'

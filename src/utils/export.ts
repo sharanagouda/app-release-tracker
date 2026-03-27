@@ -38,6 +38,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
       'Status',
       'Build Link',
       'Platform Notes',
+      'Version Changes',
       'Changes',
       'General Notes',
       'Created At',
@@ -72,6 +73,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
               safeStringify(cr.status),
               safeStringify(cr.buildLink),
               safeStringify(cr.notes),
+              safeStringify(cr.versionChanges),
               safeStringify(release.changes),
               safeStringify(release.notes),
               safeStringify(release.createdAt),
@@ -94,6 +96,7 @@ export const exportToCSVFunction = (releases: Release[]): void => {
             safeStringify(platform.status),
             safeStringify(platform.buildLink),
             safeStringify(platform.notes),
+            '', // Version Changes (not available in legacy format)
             safeStringify(release.changes),
             safeStringify(release.notes),
             safeStringify(release.createdAt),
@@ -157,6 +160,12 @@ export const exportToJSONFunction = (releases: Release[]): void => {
             });
           }
           
+          const cleanVersionChanges: string[] = [];
+          const versionChanges = cr.versionChanges || [];
+          for (let n = 0; n < versionChanges.length; n++) {
+            cleanVersionChanges.push(String(versionChanges[n]));
+          }
+
           cleanConceptReleases.push({
             id: cr.id || '',
             concepts: Array.isArray(cr.concepts) ? cr.concepts : [],
@@ -166,6 +175,7 @@ export const exportToJSONFunction = (releases: Release[]): void => {
             status: cr.status || '',
             notes: cr.notes || '',
             buildLink: cr.buildLink || '',
+            versionChanges: cleanVersionChanges,
             rolloutHistory: cleanRolloutHistory
           });
         }
@@ -241,6 +251,7 @@ const buildJSONString = (data: any[]): string => {
         result += indent + indent + indent + indent + indent + indent + `"status": "${cr.status}",\n`;
         result += indent + indent + indent + indent + indent + indent + `"notes": "${cr.notes}",\n`;
         result += indent + indent + indent + indent + indent + indent + `"buildLink": "${cr.buildLink}",\n`;
+        result += indent + indent + indent + indent + indent + indent + `"versionChanges": [${(cr.versionChanges || []).map((vc: string) => `"${vc}"`).join(', ')}],\n`;
         result += indent + indent + indent + indent + indent + indent + `"rolloutHistory": []\n`;
         result += indent + indent + indent + indent + indent + '}';
         if (k < platform.conceptReleases.length - 1) result += ',';
