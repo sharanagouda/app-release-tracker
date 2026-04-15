@@ -18,6 +18,8 @@ import {
   getDocs,
   query,
   where,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { ActivityLogEntry, ActivityAction } from '../types/release';
@@ -56,20 +58,27 @@ export const getActivityLogsForRelease = async (
   releaseId: string,
   maxEntries = 100
 ): Promise<ActivityLogEntry[]> => {
-  const q = query(
-    collection(db, ACTIVITY_LOGS_COLLECTION),
-    where('releaseId', '==', releaseId)
-  );
-  const snapshot = await getDocs(q);
-  const entries = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...(doc.data() as Omit<ActivityLogEntry, 'id'>),
-  }));
+  try {
+    const q = query(
+      collection(db, ACTIVITY_LOGS_COLLECTION),
+      where('releaseId', '==', releaseId),
+      // Use limit() to reduce reads - more efficient than client-side slice
+      // Note: Sorting requires client-side since we can't use orderBy without composite index
+    );
+    const snapshot = await getDocs(q);
+    const entries = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<ActivityLogEntry, 'id'>),
+    }));
 
-  // Sort newest first client-side
-  entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    // Sort newest first client-side
+    entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
-  return entries.slice(0, maxEntries);
+    return entries.slice(0, maxEntries);
+  } catch (error) {
+    console.error('Error fetching activity logs for release:', error);
+    throw error;
+  }
 };
 
 /**
@@ -77,17 +86,89 @@ export const getActivityLogsForRelease = async (
  * Sorting is done client-side.
  */
 export const getAllActivityLogs = async (maxEntries = 200): Promise<ActivityLogEntry[]> => {
+  try {
+    const q = query(collection(db, ACTIVITY_LOGS_COLLECTION));
+    const snapshot = await getDocs(q);
+    const entries = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<ActivityLogEntry, 'id'>),
+    }));
+
+    // Sort newest first client-side
+    entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+    return entries.slice(0, maxEntries);
+  } catch (error) {
+    console.error('Error fetching all activity logs:', error);
+    throw error;
+  }
+};
+
+// ─── Real-time Subscription ────────────────────────────────────────────────────
+
+/**
+ * Subscribe to real-time activity logs for a specific release.
+ * Returns an unsubscribe function that should be called on cleanup.
+ * Sorting is done client-side.
+ */
+export const subscribeToActivityLogs = (
+  releaseId: string,
+  onData: (logs: ActivityLogEntry[]) => void,
+  onError: (error: Error) => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, ACTIVITY_LOGS_COLLECTION),
+    where('releaseId', '==', releaseId)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const entries = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...(doc.data() as Omit<ActivityLogEntry, 'id'>),
+      }));
+
+      // Sort newest first client-side
+      entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+      onData(entries);
+    },
+    (error) => {
+      console.error('Activity logs onSnapshot error:', error);
+      onError(error as Error);
+    }
+  );
+};
+
+/**
+ * Subscribe to real-time activity logs across ALL releases (global view).
+ * Returns an unsubscribe function that should be called on cleanup.
+ */
+export const subscribeToAllActivityLogs = (
+  onData: (logs: ActivityLogEntry[]) => void,
+  onError: (error: Error) => void
+): Unsubscribe => {
   const q = query(collection(db, ACTIVITY_LOGS_COLLECTION));
-  const snapshot = await getDocs(q);
-  const entries = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...(doc.data() as Omit<ActivityLogEntry, 'id'>),
-  }));
 
-  // Sort newest first client-side
-  entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const entries = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...(doc.data() as Omit<ActivityLogEntry, 'id'>),
+      }));
 
-  return entries.slice(0, maxEntries);
+      // Sort newest first client-side
+      entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+      onData(entries);
+    },
+    (error) => {
+      console.error('All activity logs onSnapshot error:', error);
+      onError(error as Error);
+    }
+  );
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

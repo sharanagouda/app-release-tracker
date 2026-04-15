@@ -50,28 +50,33 @@ export const addComment = async (
 ): Promise<string> => {
   const userInfo = getUserInfo();
 
-  const docRef = await addDoc(collection(db, COMMENTS_COLLECTION), {
-    releaseId,
-    text,
-    userEmail: userInfo.email,
-    userName: userInfo.displayName,
-    createdAt: new Date().toISOString(),
-    edited: false,
-  });
+  try {
+    const docRef = await addDoc(collection(db, COMMENTS_COLLECTION), {
+      releaseId,
+      text,
+      userEmail: userInfo.email,
+      userName: userInfo.displayName,
+      createdAt: new Date().toISOString(),
+      edited: false,
+    });
 
-  // Log to activity trail (fire-and-forget)
-  addActivityLog({
-    releaseId,
-    releaseName,
-    action: 'commented',
-    summary: `${userInfo.displayName} commented: "${text.length > 80 ? text.slice(0, 80) + '…' : text}"`,
-    field: 'comment',
-    newValue: text,
-    userEmail: userInfo.email,
-    userName: userInfo.displayName,
-  }).catch(console.error);
+    // Log to activity trail (fire-and-forget)
+    addActivityLog({
+      releaseId,
+      releaseName,
+      action: 'commented',
+      summary: `${userInfo.displayName} commented: "${text.length > 80 ? text.slice(0, 80) + '…' : text}"`,
+      field: 'comment',
+      newValue: text,
+      userEmail: userInfo.email,
+      userName: userInfo.displayName,
+    }).catch(console.error);
 
-  return docRef.id;
+    return docRef.id;
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    throw error;
+  }
 };
 
 export const updateComment = async (
@@ -79,11 +84,16 @@ export const updateComment = async (
   newText: string
 ): Promise<void> => {
   const docRef = doc(db, COMMENTS_COLLECTION, commentId);
-  await updateDoc(docRef, {
-    text: newText,
-    updatedAt: new Date().toISOString(),
-    edited: true,
-  });
+  try {
+    await updateDoc(docRef, {
+      text: newText,
+      updatedAt: new Date().toISOString(),
+      edited: true,
+    });
+  } catch (error) {
+    console.error('Error updating comment:', error);
+    throw error;
+  }
 };
 
 export const deleteComment = async (
@@ -94,19 +104,25 @@ export const deleteComment = async (
 ): Promise<void> => {
   const userInfo = getUserInfo();
   const docRef = doc(db, COMMENTS_COLLECTION, commentId);
-  await deleteDoc(docRef);
+  
+  try {
+    await deleteDoc(docRef);
 
-  // Log deletion to activity trail (fire-and-forget)
-  addActivityLog({
-    releaseId,
-    releaseName,
-    action: 'commented',
-    summary: `${userInfo.displayName} deleted a comment: "${commentText.length > 80 ? commentText.slice(0, 80) + '…' : commentText}"`,
-    field: 'comment_deleted',
-    oldValue: commentText,
-    userEmail: userInfo.email,
-    userName: userInfo.displayName,
-  }).catch(console.error);
+    // Log deletion to activity trail (fire-and-forget)
+    addActivityLog({
+      releaseId,
+      releaseName,
+      action: 'commented',
+      summary: `${userInfo.displayName} deleted a comment: "${commentText.length > 80 ? commentText.slice(0, 80) + '…' : commentText}"`,
+      field: 'comment_deleted',
+      oldValue: commentText,
+      userEmail: userInfo.email,
+      userName: userInfo.displayName,
+    }).catch(console.error);
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    throw error;
+  }
 };
 
 // ─── Real-time Read ───────────────────────────────────────────────────────────

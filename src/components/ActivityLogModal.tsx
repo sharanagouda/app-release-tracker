@@ -30,7 +30,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { ActivityLogEntry, ActivityAction } from '../types/release';
-import { getActivityLogsForRelease, formatActivityTimestamp } from '../services/firebaseActivityLog';
+import { getActivityLogsForRelease, subscribeToActivityLogs, formatActivityTimestamp } from '../services/firebaseActivityLog';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -219,6 +219,7 @@ const ALL_ACTIONS: ActivityAction[] = [
   'rollout_updated',
   'status_changed',
   'tags_updated',
+  'commented',
 ];
 
 export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
@@ -248,10 +249,28 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
     }
   }, [releaseId]);
 
-  // Fetch when modal opens
+  // Subscribe to real-time updates when modal opens
   useEffect(() => {
-    if (isOpen) fetchLogs();
-  }, [isOpen, fetchLogs]);
+    if (!isOpen || !releaseId) return;
+    
+    setLoading(true);
+    setError(null);
+
+    const unsubscribe = subscribeToActivityLogs(
+      releaseId,
+      (data) => {
+        setLogs(data);
+        setLoading(false);
+      },
+      (err) => {
+        setError('Failed to load activity log. Please try again.');
+        console.error(err);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isOpen, releaseId]);
 
   if (!isOpen) return null;
 
