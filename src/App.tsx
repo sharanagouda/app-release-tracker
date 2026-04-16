@@ -56,6 +56,7 @@ function App() {
   const [isTeamsGroupsConfigOpen, setIsTeamsGroupsConfigOpen] = useState(false);
   const [accessRequestCount, setAccessRequestCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userRole === 'admin';
@@ -66,12 +67,12 @@ function App() {
 
     const unsubscribe = onAuthChange(async (authUser) => {
       setUser(authUser);
-      
+
       if (authUser) {
         try {
           // Ensure user profile exists in Firestore
           await ensureUserProfile(authUser.uid, authUser.email || '');
-          
+
           // Subscribe to role changes
           roleUnsubscribe = subscribeToUserRole(authUser.uid, (role) => {
             setUserRole(role);
@@ -101,7 +102,7 @@ function App() {
       setDarkMode(JSON.parse(savedDarkMode));
     }
   }, []);
-  
+
 
   // Save dark mode preference to localStorage
   useEffect(() => {
@@ -147,9 +148,12 @@ function App() {
       return;
     }
 
+    console.log('Subscribing to notifications for:', user.uid);
+
     const unsubscribe = subscribeToNotifications(
       user.uid,
       (notifs) => {
+        console.log('Received notifications:', notifs);
         setNotifications(notifs);
       },
       (error) => {
@@ -182,11 +186,11 @@ function App() {
   const getOverallStatus = (release: Release) => {
     const platforms = release.platforms || [];
     if (platforms.length === 0) return 'In Progress';
-    
+
     let allComplete = true;
     let allPaused = true;
     let hasAnyRelease = false;
-    
+
     platforms.forEach(platform => {
       const conceptReleases = getConceptReleases(platform);
       conceptReleases.forEach((cr: any) => {
@@ -195,7 +199,7 @@ function App() {
         if (cr.status !== 'Paused') allPaused = false;
       });
     });
-    
+
     if (!hasAnyRelease) return 'Not Started';
     if (allComplete) return 'Complete';
     if (allPaused) return 'Paused';
@@ -205,20 +209,20 @@ function App() {
   const filteredReleases = releases.filter(release => {
     const environment = release.environment || release.concept || '';
     const searchLower = searchTerm.toLowerCase();
-    
+
     // Search across name, environment, version, build ID, and tags
     const matchesSearch = release.releaseName?.toLowerCase().includes(searchLower) ||
-                         environment.toLowerCase().includes(searchLower) ||
-                         (release.platforms || []).some(p => {
-                           const conceptReleases = getConceptReleases(p);
-                           return conceptReleases.some((cr: any) =>
-                             (cr.version || '').toLowerCase().includes(searchLower) ||
-                             (cr.buildId || '').toLowerCase().includes(searchLower)
-                           );
-                         }) ||
-                         (release.tags || []).some(t => t.toLowerCase().includes(searchLower)) ||
-                         (release.isNative && 'native'.includes(searchLower));
-    
+      environment.toLowerCase().includes(searchLower) ||
+      (release.platforms || []).some(p => {
+        const conceptReleases = getConceptReleases(p);
+        return conceptReleases.some((cr: any) =>
+          (cr.version || '').toLowerCase().includes(searchLower) ||
+          (cr.buildId || '').toLowerCase().includes(searchLower)
+        );
+      }) ||
+      (release.tags || []).some(t => t.toLowerCase().includes(searchLower)) ||
+      (release.isNative && 'native'.includes(searchLower));
+
     const matchesStatus = !filters.status || filters.status === 'All' || getOverallStatus(release) === filters.status;
     const matchesEnvironment = !filters.environment || filters.environment === 'All' || environment === filters.environment;
 
@@ -226,7 +230,7 @@ function App() {
     const releaseDate = release.releaseDate ? release.releaseDate.substring(0, 10) : '';
     const matchesDateStart = !filters.dateRange?.start || releaseDate >= filters.dateRange.start;
     const matchesDateEnd = !filters.dateRange?.end || releaseDate <= filters.dateRange.end;
-    
+
     return matchesSearch && matchesStatus && matchesEnvironment && matchesDateStart && matchesDateEnd;
   }).sort((a, b) => {
     // Apply sorting
@@ -289,15 +293,15 @@ function App() {
       description: 'Close modal / clear search',
       allowInInput: true,
       action: () => {
-      if (isShortcutsHelpOpen) { setIsShortcutsHelpOpen(false); return; }
-      if (isActivityLogOpen) { setIsActivityLogOpen(false); setActivityLogRelease(null); return; }
-      if (isModalOpen) { setIsModalOpen(false); setEditingRelease(null); return; }
-      if (isDetailsModalOpen) { setIsDetailsModalOpen(false); setSelectedRelease(null); return; }
-      if (isAuthModalOpen) { setIsAuthModalOpen(false); return; }
-      if (isExportModalOpen) { setIsExportModalOpen(false); return; }
-      if (isDeleteModalOpen) { setIsDeleteModalOpen(false); setReleaseToDelete(null); return; }
-      if (searchTerm) { setSearchTerm(''); searchInputRef.current?.blur(); }
-    },
+        if (isShortcutsHelpOpen) { setIsShortcutsHelpOpen(false); return; }
+        if (isActivityLogOpen) { setIsActivityLogOpen(false); setActivityLogRelease(null); return; }
+        if (isModalOpen) { setIsModalOpen(false); setEditingRelease(null); return; }
+        if (isDetailsModalOpen) { setIsDetailsModalOpen(false); setSelectedRelease(null); return; }
+        if (isAuthModalOpen) { setIsAuthModalOpen(false); return; }
+        if (isExportModalOpen) { setIsExportModalOpen(false); return; }
+        if (isDeleteModalOpen) { setIsDeleteModalOpen(false); setReleaseToDelete(null); return; }
+        if (searchTerm) { setSearchTerm(''); searchInputRef.current?.blur(); }
+      },
     },
     {
       key: 'ArrowLeft',
@@ -444,9 +448,8 @@ function App() {
         {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className={`text-3xl font-bold mb-2 ${
-              darkMode ? 'text-gray-100' : 'text-gray-900'
-            }`}>
+            <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-gray-100' : 'text-gray-900'
+              }`}>
               Release Tracker
             </h1>
             <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
@@ -461,43 +464,48 @@ function App() {
             )}
             <button
               onClick={() => setIsShortcutsHelpOpen(true)}
-              className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
-                darkMode
+              className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
                   ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                   : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-              }`}
+                }`}
               title="Keyboard shortcuts (?)"
             >
               <Keyboard className="w-4 h-4" />
             </button>
             <button
               onClick={toggleDarkMode}
-              className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
-                darkMode
+              className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${darkMode
                   ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                   : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-              }`}
+                }`}
               title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            {user && notifications.length > 0 && (
+            {user && (
               <button
-                onClick={() => {
-                  notifications.forEach(n => markNotificationAsRead(n.id));
-                  setNotifications([]);
+                onClick={async () => {
+                  if (notifications.length > 0) {
+                    const messages = notifications.map(n => n.message).join('\n• ');
+                    setToastMessage(`• ${messages}`);
+                    await Promise.all(notifications.map(n => markNotificationAsRead(n.id)));
+                    setNotifications([]);
+                  } else {
+                    setToastMessage('No new notifications');
+                  }
                 }}
-                className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
-                  darkMode
+                className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
                     ? 'text-yellow-300 bg-yellow-900/30 hover:bg-yellow-900/50'
                     : 'text-yellow-700 bg-yellow-100 hover:bg-yellow-200'
-                }`}
-                title={`${notifications.length} notification(s)`}
+                  }`}
+                title={notifications.length > 0 ? `${notifications.length} notification(s)` : 'No notifications'}
               >
                 <Bell className="w-4 h-4" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {notifications.length > 9 ? '9+' : notifications.length}
-                </span>
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {notifications.length > 9 ? '9+' : notifications.length}
+                  </span>
+                )}
               </button>
             )}
             {user ? (
@@ -506,11 +514,10 @@ function App() {
                   <>
                     <button
                       onClick={() => setIsAdminPanelOpen(true)}
-                      className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
-                        darkMode
+                      className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
                           ? 'text-purple-300 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700'
                           : 'text-purple-700 bg-purple-100 hover:bg-purple-200 border border-purple-200'
-                      }`}
+                        }`}
                       title="Admin Panel"
                     >
                       <Shield className="w-4 h-4 mr-2" />
@@ -523,11 +530,10 @@ function App() {
                     </button>
                     <button
                       onClick={() => setIsTeamsGroupsConfigOpen(true)}
-                      className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
-                        darkMode
+                      className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
                           ? 'text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-700'
                           : 'text-blue-700 bg-blue-100 hover:bg-blue-200 border border-blue-200'
-                      }`}
+                        }`}
                       title="Configure Teams Groups"
                     >
                       <Settings className="w-4 h-4 mr-2" />
@@ -537,11 +543,10 @@ function App() {
                 )}
                 <button
                   onClick={handleLogout}
-                  className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
-                    darkMode
+                  className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${darkMode
                       ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                       : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
@@ -553,11 +558,10 @@ function App() {
                   setAuthAction('sign in');
                   setIsAuthModalOpen(true);
                 }}
-                className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
-                  darkMode
+                className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${darkMode
                     ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                     : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 <LogIn className="w-4 h-4 mr-2" />
                 Sign In
@@ -662,7 +666,7 @@ function App() {
           darkMode={darkMode}
           searchRef={searchInputRef}
         />
-        
+
         <div className="flex justify-end mb-6 gap-3">
           <button
             onClick={() => setIsCompareModalOpen(true)}
@@ -685,9 +689,8 @@ function App() {
           <>
             {/* Desktop Table Skeleton */}
             <div className="hidden lg:block">
-              <div className={`rounded-lg border shadow-sm overflow-hidden ${
-                darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-              }`}>
+              <div className={`rounded-lg border shadow-sm overflow-hidden ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}>
                 {/* Table header skeleton */}
                 <div className={`px-4 py-3 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
                   <div className="flex gap-6">
@@ -714,9 +717,8 @@ function App() {
             {/* Mobile Card Skeleton */}
             <div className="lg:hidden space-y-4">
               {[1, 2, 3].map((card) => (
-                <div key={card} className={`rounded-lg border p-4 animate-pulse ${
-                  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                }`}>
+                <div key={card} className={`rounded-lg border p-4 animate-pulse ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                  }`}>
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className={`h-5 w-40 rounded mb-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
@@ -737,144 +739,134 @@ function App() {
 
         {/* Desktop Table View */}
         {!loading && (
-        <div className="hidden lg:block">
-          <div className={`rounded-lg border shadow-sm overflow-hidden ${
-            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-            <ReleaseTable
-              releases={pagination.paginatedItems}
-              onEdit={handleEditRelease}
-              onDelete={handleDeleteRelease}
-              onViewDetails={handleViewDetails}
-              isAdmin={isAdmin}
-              canEdit={canEdit}
-              onAuthRequired={handleAuthRequired}
-              darkMode={darkMode}
-            />
-            <Pagination {...pagination} darkMode={darkMode} />
+          <div className="hidden lg:block">
+            <div className={`rounded-lg border shadow-sm overflow-hidden ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+              }`}>
+              <ReleaseTable
+                releases={pagination.paginatedItems}
+                onEdit={handleEditRelease}
+                onDelete={handleDeleteRelease}
+                onViewDetails={handleViewDetails}
+                isAdmin={isAdmin}
+                canEdit={canEdit}
+                onAuthRequired={handleAuthRequired}
+                darkMode={darkMode}
+              />
+              <Pagination {...pagination} darkMode={darkMode} />
+            </div>
           </div>
-        </div>
         )}
 
         {/* Mobile Card View */}
         {!loading && (
-        <div className="lg:hidden space-y-4">
-          {pagination.paginatedItems.map((release) => {
-            const overallStatus = getOverallStatus(release);
-            const statusColors = darkMode ? {
-              'Complete': 'bg-green-900/30 text-green-300',
-              'In Progress': 'bg-blue-900/30 text-blue-300',
-              'Paused': 'bg-red-900/30 text-red-300'
-            } : {
-              'Complete': 'bg-green-100 text-green-800',
-              'In Progress': 'bg-blue-100 text-blue-800',
-              'Paused': 'bg-red-100 text-red-800'
-            };
+          <div className="lg:hidden space-y-4">
+            {pagination.paginatedItems.map((release) => {
+              const overallStatus = getOverallStatus(release);
+              const statusColors = darkMode ? {
+                'Complete': 'bg-green-900/30 text-green-300',
+                'In Progress': 'bg-blue-900/30 text-blue-300',
+                'Paused': 'bg-red-900/30 text-red-300'
+              } : {
+                'Complete': 'bg-green-100 text-green-800',
+                'In Progress': 'bg-blue-100 text-blue-800',
+                'Paused': 'bg-red-100 text-red-800'
+              };
 
-            return (
-              <div 
-                key={release.id} 
-                className={`rounded-lg shadow-sm border p-4 cursor-pointer transition-shadow ${
-                  darkMode 
-                    ? 'bg-gray-800 border-gray-700 hover:shadow-md' 
-                    : 'bg-white border-gray-200 hover:shadow-md'
-                }`}
-                onClick={() => handleViewDetails(release)}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className={`font-semibold ${
-                      darkMode ? 'text-gray-100' : 'text-gray-900'
-                    }`}>
-                      {release.releaseName}
-                    </h3>
-                    <p className={`text-sm ${
-                      darkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>
-                      {release.environment || release.concept}
-                    </p>
-                    {release.tags && release.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {release.tags.map(tag => (
-                          <TagBadge key={tag} tag={tag} darkMode={darkMode} size="xs" />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[overallStatus as keyof typeof statusColors]}`}>
-                    {overallStatus}
-                  </span>
-                </div>
-                
-                <div className="space-y-2 mb-4">
-                  {release.platforms?.map((platform, idx) => {
-                    const conceptReleases = getConceptReleases(platform);
-                    const firstRelease = conceptReleases[0];
-                    
-                    return (
-                      <div key={idx} className="flex justify-between items-center">
-                        <span className={`text-sm ${
-                          darkMode ? 'text-gray-400' : 'text-gray-600'
+              return (
+                <div
+                  key={release.id}
+                  className={`rounded-lg shadow-sm border p-4 cursor-pointer transition-shadow ${darkMode
+                      ? 'bg-gray-800 border-gray-700 hover:shadow-md'
+                      : 'bg-white border-gray-200 hover:shadow-md'
+                    }`}
+                  onClick={() => handleViewDetails(release)}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className={`font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-900'
                         }`}>
-                          {platform.platform}
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-sm font-medium ${
-                            darkMode ? 'text-gray-300' : 'text-gray-900'
-                          }`}>
-                            {firstRelease?.version || 'N/A'}
-                          </span>
-                          <span className={`text-xs ${
-                            darkMode ? 'text-gray-500' : 'text-gray-500'
-                          }`}>
-                            {firstRelease?.rolloutPercentage || 0}%
-                          </span>
+                        {release.releaseName}
+                      </h3>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>
+                        {release.environment || release.concept}
+                      </p>
+                      {release.tags && release.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {release.tags.map(tag => (
+                            <TagBadge key={tag} tag={tag} darkMode={darkMode} size="xs" />
+                          ))}
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      )}
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[overallStatus as keyof typeof statusColors]}`}>
+                      {overallStatus}
+                    </span>
+                  </div>
 
-                <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => handleViewDetails(release)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${
-                      darkMode
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    View Details
-                  </button>
-                  <button
-                    onClick={() => handleEditRelease(release)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${
-                      darkMode
-                        ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50'
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    }`}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteRelease(release)}
-                    className={`px-3 py-2 text-sm rounded-md transition-colors ${
-                      darkMode
-                        ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
-                        : 'bg-red-100 text-red-700 hover:bg-red-200'
-                    }`}
-                  >
-                    Delete
-                  </button>
+                  <div className="space-y-2 mb-4">
+                    {release.platforms?.map((platform, idx) => {
+                      const conceptReleases = getConceptReleases(platform);
+                      const firstRelease = conceptReleases[0];
+
+                      return (
+                        <div key={idx} className="flex justify-between items-center">
+                          <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                            }`}>
+                            {platform.platform}
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-900'
+                              }`}>
+                              {firstRelease?.version || 'N/A'}
+                            </span>
+                            <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-500'
+                              }`}>
+                              {firstRelease?.rolloutPercentage || 0}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleViewDetails(release)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${darkMode
+                          ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                      View Details
+                    </button>
+                    <button
+                      onClick={() => handleEditRelease(release)}
+                      className={`flex-1 px-3 py-2 text-sm rounded-md transition-colors ${darkMode
+                          ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50'
+                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRelease(release)}
+                      className={`px-3 py-2 text-sm rounded-md transition-colors ${darkMode
+                          ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50'
+                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                        }`}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-          {/* Mobile Pagination */}
-          {pagination.totalPages > 1 && (
-            <Pagination {...pagination} darkMode={darkMode} />
-          )}
-        </div>
+              );
+            })}
+            {/* Mobile Pagination */}
+            {pagination.totalPages > 1 && (
+              <Pagination {...pagination} darkMode={darkMode} />
+            )}
+          </div>
         )}
 
         {!loading && filteredReleases.length === 0 && (
@@ -882,9 +874,8 @@ function App() {
             <div className={darkMode ? 'text-gray-600' : 'text-gray-400'}>
               <Filter className="w-12 h-12 mx-auto mb-4" />
             </div>
-            <h3 className={`text-lg font-medium mb-2 ${
-              darkMode ? 'text-gray-300' : 'text-gray-900'
-            }`}>
+            <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-900'
+              }`}>
               No releases found
             </h3>
             <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
@@ -966,7 +957,7 @@ function App() {
         darkMode={darkMode}
       />
 
-<ActivityLogModal
+      <ActivityLogModal
         isOpen={isActivityLogOpen}
         onClose={() => {
           setIsActivityLogOpen(false);
@@ -1021,6 +1012,29 @@ function App() {
         onClose={() => setIsAdminPanelOpen(false)}
         darkMode={darkMode}
       />
+
+      {toastMessage && (
+        <div
+          className="fixed inset-0 z-40 cursor-pointer"
+          onClick={() => setToastMessage(null)}
+        >
+          <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 cursor-auto">
+            <div className={`px-4 py-3 rounded-lg shadow-lg max-w-md ${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-800 text-white'
+              }`}>
+              <div className="text-sm whitespace-pre-line">{toastMessage} </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setToastMessage(null);
+                }}
+                className={`absolute top-2 right-2 ${darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-white'}`}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
