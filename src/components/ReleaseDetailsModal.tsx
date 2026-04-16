@@ -4,6 +4,8 @@ import { ConceptRelease, Release } from '../types/release';
 import { getConceptReleases } from '../utils/conceptReleases';
 import { TagBadge } from './TagInput';
 import { CommentsSection } from './CommentsSection';
+import { LinkifyText } from './LinkifyText';
+import { TeamsGroup } from '../services/firebaseConfig';
 
 interface ReleaseDetailsModalProps {
   isOpen: boolean;
@@ -12,6 +14,7 @@ interface ReleaseDetailsModalProps {
   darkMode?: boolean;
   currentUserEmail?: string;
   isAdmin?: boolean;
+  teamsGroups?: TeamsGroup[];
   /** Called when the user clicks the Activity Log button */
   onViewActivityLog?: (release: Release) => void;
   /** Called when user tries an action they don't have permission for (shows PermissionDeniedModal) */
@@ -120,6 +123,7 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
   darkMode = false,
   currentUserEmail,
   isAdmin = false,
+  teamsGroups: teamsGroupsProp = [],
   onViewActivityLog,
   onRequestPermission,
 }) => {
@@ -130,19 +134,8 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [teamsMessage, setTeamsMessage] = useState('');
 
-  // Teams groups configuration — add more groups here as needed
-  const teamsGroups = [
-    {
-      id: 'mobile-releases',
-      name: 'Mobile Releases',
-      url: 'https://teams.microsoft.com/l/chat/19:e74fc43b44cc490f9c79707b3a73cbc4@thread.v2/conversations?context=%7B%22contextType%22%3A%22chat%22%7D',
-    },
-     {
-      id: 'Release-group-for-BLC',
-      name: 'Release-group-for-BLC',
-      url: 'https://teams.microsoft.com/l/chat/19:00c1e6a443f4473a9c928734dc53f4e4@thread.v2/conversations?context=%7B%22contextType%22%3A%22chat%22%7D',
-    },
-  ];
+  // Use teams groups from props (dynamically configured)
+  const teamsGroups = teamsGroupsProp;
 
   if (!isOpen || !release) return null;
 
@@ -765,11 +758,9 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                                           <div className={`h-1.5 w-1.5 rounded-full mt-1.5 flex-shrink-0 ${
                                             darkMode ? 'bg-emerald-400' : 'bg-emerald-500'
                                           }`} />
-                                          <span className={`text-xs sm:text-sm ${
+                                          <LinkifyText text={vc} darkMode={darkMode} className={`text-xs sm:text-sm ${
                                             darkMode ? 'text-emerald-200' : 'text-emerald-800'
-                                          }`}>
-                                            {vc}
-                                          </span>
+                                          }`} />
                                         </li>
                                       ))}
                                     </ul>
@@ -861,11 +852,9 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                   {release.changes.map((change, index) => (
                     <li key={index} className="flex items-start gap-2 sm:gap-3">
                       <div className="h-2 w-2 bg-blue-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0" />
-                      <span className={`text-xs sm:text-sm ${
+                      <LinkifyText text={change} darkMode={darkMode} className={`text-xs sm:text-sm ${
                         darkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
-                        {change}
-                      </span>
+                      }`} />
                     </li>
                   ))}
                 </ul>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun, Keyboard, LogIn, Shield } from 'lucide-react';
+import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun, Keyboard, LogIn, Shield, GitCompare, Settings } from 'lucide-react';
 import { FilterOptions, Release } from './types/release';
 import { getConceptReleases } from './utils/conceptReleases';
 import { exportToCSVFunction, exportToJSONFunction } from './utils/export';
@@ -23,6 +23,9 @@ import { User } from 'firebase/auth';
 import { ensureUserProfile, subscribeToUserRole, UserRole } from './services/firebaseUsers';
 import { AdminPanel } from './components/AdminPanel';
 import { PermissionDeniedModal } from './components/PermissionDeniedModal';
+import { CompareReleasesModal } from './components/CompareReleasesModal';
+import { TeamsGroupsConfigModal } from './components/TeamsGroupsConfigModal';
+import { initializeDefaultTeamsGroups, addTeamsGroup, updateTeamsGroup, deleteTeamsGroup, getTeamsGroups, TeamsGroup } from './services/firebaseConfig';
 
 function App() {
   const { releases, loading, saving, saveError, addRelease, updateRelease, deleteRelease } = useReleases();
@@ -47,6 +50,9 @@ function App() {
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogRelease, setActivityLogRelease] = useState<Release | null>(null);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [teamsGroups, setTeamsGroups] = useState<TeamsGroup[]>([]);
+  const [isTeamsGroupsConfigOpen, setIsTeamsGroupsConfigOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userRole === 'admin';
@@ -98,6 +104,19 @@ function App() {
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
   }, [darkMode]);
+
+  // Load teams groups on mount
+  useEffect(() => {
+    const loadTeamsGroups = async () => {
+      try {
+        const groups = await initializeDefaultTeamsGroups();
+        setTeamsGroups(groups);
+      } catch (error) {
+        console.error('Error loading teams groups:', error);
+      }
+    };
+    loadTeamsGroups();
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -423,18 +442,32 @@ function App() {
             {user ? (
               <>
                 {isAdmin && (
-                  <button
-                    onClick={() => setIsAdminPanelOpen(true)}
-                    className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
-                      darkMode
-                        ? 'text-purple-300 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700'
-                        : 'text-purple-700 bg-purple-100 hover:bg-purple-200 border border-purple-200'
-                    }`}
-                    title="Admin Panel"
-                  >
-                    <Shield className="w-4 h-4 mr-2" />
-                    Admin
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setIsAdminPanelOpen(true)}
+                      className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                        darkMode
+                          ? 'text-purple-300 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700'
+                          : 'text-purple-700 bg-purple-100 hover:bg-purple-200 border border-purple-200'
+                      }`}
+                      title="Admin Panel"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin
+                    </button>
+                    <button
+                      onClick={() => setIsTeamsGroupsConfigOpen(true)}
+                      className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                        darkMode
+                          ? 'text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-700'
+                          : 'text-blue-700 bg-blue-100 hover:bg-blue-200 border border-blue-200'
+                      }`}
+                      title="Configure Teams Groups"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={handleLogout}
@@ -564,7 +597,14 @@ function App() {
           searchRef={searchInputRef}
         />
         
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-end mb-6 gap-3">
+          <button
+            onClick={() => setIsCompareModalOpen(true)}
+            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <GitCompare className="w-5 h-5 mr-2" />
+            Compare Releases
+          </button>
           <button
             onClick={handleAddRelease}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -811,6 +851,7 @@ function App() {
         darkMode={darkMode}
         currentUserEmail={user?.email || undefined}
         isAdmin={isAdmin}
+        teamsGroups={teamsGroups}
         onViewActivityLog={handleViewActivityLog}
         onRequestPermission={(action) => {
           // If the user is not signed in, show the AuthModal.
@@ -859,30 +900,60 @@ function App() {
         darkMode={darkMode}
       />
 
-      <ActivityLogModal
+<ActivityLogModal
         isOpen={isActivityLogOpen}
         onClose={() => {
           setIsActivityLogOpen(false);
           setActivityLogRelease(null);
         }}
-        releaseId={activityLogRelease?.id ?? ''}
-        releaseName={activityLogRelease?.releaseName ?? ''}
+        releaseId={activityLogRelease?.id || ''}
+        releaseName={activityLogRelease?.releaseName || ''}
         darkMode={darkMode}
       />
+
+      <CompareReleasesModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        releases={releases}
+        darkMode={darkMode}
+      />
+
+      <TeamsGroupsConfigModal
+        isOpen={isTeamsGroupsConfigOpen}
+        onClose={() => setIsTeamsGroupsConfigOpen(false)}
+        teamsGroups={teamsGroups}
+        onAddGroup={async (name, url) => {
+          await addTeamsGroup(name, url, user?.email || undefined);
+          const groups = await getTeamsGroups();
+          setTeamsGroups(groups);
+        }}
+        onUpdateGroup={async (id, name, url) => {
+          await updateTeamsGroup(id, name, url, user?.email || undefined);
+          const groups = await getTeamsGroups();
+          setTeamsGroups(groups);
+        }}
+        onDeleteGroup={async (id) => {
+          await deleteTeamsGroup(id, user?.email || undefined);
+          const groups = await getTeamsGroups();
+          setTeamsGroups(groups);
+        }}
+        darkMode={darkMode}
+      />
+
+      {permissionDeniedAction && (
+        <PermissionDeniedModal
+          isOpen={isPermissionDeniedOpen}
+          onClose={() => setIsPermissionDeniedOpen(false)}
+          user={user ? { uid: user.uid, email: user.email, displayName: getDisplayName(user) } : null}
+          darkMode={darkMode}
+          action={permissionDeniedAction}
+        />
+      )}
 
       <AdminPanel
         isOpen={isAdminPanelOpen}
         onClose={() => setIsAdminPanelOpen(false)}
         darkMode={darkMode}
-        currentUserUid={user?.uid}
-      />
-
-      <PermissionDeniedModal
-        isOpen={isPermissionDeniedOpen}
-        onClose={() => setIsPermissionDeniedOpen(false)}
-        user={user ? { uid: user.uid, email: user.email, displayName: getDisplayName(user) } : null}
-        darkMode={darkMode}
-        action={permissionDeniedAction}
       />
     </div>
   );

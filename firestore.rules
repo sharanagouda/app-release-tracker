@@ -66,5 +66,11 @@ service cloud.firestore {
       allow update: if signedIn() && isAdmin();
       allow delete: if false;
     }
+
+    // App config (teams groups) - read by all signed in, write by admin only
+    match /appConfig/{configId} {
+      allow read: if signedIn();
+      allow write: if signedIn() && isAdmin();
+    }
   }
 }
