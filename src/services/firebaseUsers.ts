@@ -169,25 +169,36 @@ export const requestAccess = async (
   displayName: string,
   action?: string
 ): Promise<void> => {
-  // If the user is already an editor/admin, there's no need to request access.
-  const profileSnap = await getDoc(doc(db, USERS_COLLECTION, uid));
-  if (profileSnap.exists()) {
-    const profile = profileSnap.data() as Omit<UserProfile, 'uid'>;
-    if (profile.role === 'editor' || profile.role === 'admin') {
-      return;
+  // Try to check if user already has access, but don't fail if we can't read
+  try {
+    const profileSnap = await getDoc(doc(db, USERS_COLLECTION, uid));
+    if (profileSnap.exists()) {
+      const profile = profileSnap.data() as Omit<UserProfile, 'uid'>;
+      if (profile.role === 'editor' || profile.role === 'admin') {
+        return;
+      }
     }
+  } catch (e) {
+    // Ignore errors reading user profile - might not exist yet
   }
 
-  // Prevent duplicates only for *pending* requests.
-  const q = query(
-    collection(db, REQUESTS_COLLECTION),
-    where('uid', '==', uid),
-    where('status', '==', 'pending')
-  );
-  const snap = await getDocs(q);
-
-  if (!snap.empty) {
-    throw new Error('You already have a pending access request.');
+  // Try to check for existing pending request
+  try {
+    const q = query(
+      collection(db, REQUESTS_COLLECTION),
+      where('uid', '==', uid),
+      where('status', '==', 'pending')
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      throw new Error('You already have a pending access request.');
+    }
+  } catch (e: any) {
+    // If it's already the "already pending" error, rethrow it
+    if (e.message?.includes('pending')) {
+      throw e;
+    }
+    // Ignore other errors (like missing index) and just try to create
   }
 
   await addDoc(collection(db, REQUESTS_COLLECTION), {

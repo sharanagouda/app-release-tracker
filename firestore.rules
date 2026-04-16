@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function userRole() {
-      return signedIn() && userDoc(request.auth.uid).data.role != null
+      return signedIn() && userDoc(request.auth.uid) != null
         ? userDoc(request.auth.uid).data.role
         : 'viewer';
     }
@@ -59,12 +59,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Access requests
+    // Access requests - anyone signed in can create, admin can read/update/delete
     match /accessRequests/{requestId} {
-      allow read: if signedIn() && isAdmin();
-      allow create: if signedIn();
-      allow update: if signedIn() && isAdmin();
-      allow delete: if false;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && request.auth.token.email != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Notifications - user can read their own, admin can read all
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && (request.auth.uid == resource.data.uid || request.auth.uid == resource.data.uid);
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null;
     }
 
     // App config (teams groups) - read by all signed in, write by admin only

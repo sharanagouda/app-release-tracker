@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun, Keyboard, LogIn, Shield, GitCompare, Settings } from 'lucide-react';
+import { Plus, Filter, Search, Download, ExternalLink, LogOut, Moon, Sun, Keyboard, LogIn, Shield, GitCompare, Settings, Bell } from 'lucide-react';
 import { FilterOptions, Release } from './types/release';
 import { getConceptReleases } from './utils/conceptReleases';
 import { exportToCSVFunction, exportToJSONFunction } from './utils/export';
@@ -20,12 +20,13 @@ import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { TagBadge } from './components/TagInput';
 import { onAuthChange, logout } from './services/firebaseAuth';
 import { User } from 'firebase/auth';
-import { ensureUserProfile, subscribeToUserRole, UserRole } from './services/firebaseUsers';
+import { ensureUserProfile, subscribeToUserRole, subscribeToAccessRequests, UserRole } from './services/firebaseUsers';
 import { AdminPanel } from './components/AdminPanel';
 import { PermissionDeniedModal } from './components/PermissionDeniedModal';
 import { CompareReleasesModal } from './components/CompareReleasesModal';
 import { TeamsGroupsConfigModal } from './components/TeamsGroupsConfigModal';
 import { initializeDefaultTeamsGroups, addTeamsGroup, updateTeamsGroup, deleteTeamsGroup, getTeamsGroups, TeamsGroup } from './services/firebaseConfig';
+import { subscribeToNotifications, markNotificationAsRead, Notification } from './services/firebaseNotifications';
 
 function App() {
   const { releases, loading, saving, saveError, addRelease, updateRelease, deleteRelease } = useReleases();
@@ -53,6 +54,8 @@ function App() {
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [teamsGroups, setTeamsGroups] = useState<TeamsGroup[]>([]);
   const [isTeamsGroupsConfigOpen, setIsTeamsGroupsConfigOpen] = useState(false);
+  const [accessRequestCount, setAccessRequestCount] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userRole === 'admin';
@@ -117,6 +120,45 @@ function App() {
     };
     loadTeamsGroups();
   }, []);
+
+  // Subscribe to access requests for admin badge count
+  useEffect(() => {
+    if (!isAdmin) {
+      setAccessRequestCount(0);
+      return;
+    }
+
+    const unsubscribe = subscribeToAccessRequests(
+      (requests) => {
+        setAccessRequestCount(requests.length);
+      },
+      (error) => {
+        console.error('Error fetching access requests:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isAdmin]);
+
+  // Subscribe to notifications for current user
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+
+    const unsubscribe = subscribeToNotifications(
+      user.uid,
+      (notifs) => {
+        setNotifications(notifs);
+      },
+      (error) => {
+        console.error('Error fetching notifications:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -439,13 +481,32 @@ function App() {
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+            {user && notifications.length > 0 && (
+              <button
+                onClick={() => {
+                  notifications.forEach(n => markNotificationAsRead(n.id));
+                  setNotifications([]);
+                }}
+                className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                  darkMode
+                    ? 'text-yellow-300 bg-yellow-900/30 hover:bg-yellow-900/50'
+                    : 'text-yellow-700 bg-yellow-100 hover:bg-yellow-200'
+                }`}
+                title={`${notifications.length} notification(s)`}
+              >
+                <Bell className="w-4 h-4" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {notifications.length > 9 ? '9+' : notifications.length}
+                </span>
+              </button>
+            )}
             {user ? (
               <>
                 {isAdmin && (
                   <>
                     <button
                       onClick={() => setIsAdminPanelOpen(true)}
-                      className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                      className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
                         darkMode
                           ? 'text-purple-300 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700'
                           : 'text-purple-700 bg-purple-100 hover:bg-purple-200 border border-purple-200'
@@ -454,6 +515,11 @@ function App() {
                     >
                       <Shield className="w-4 h-4 mr-2" />
                       Admin
+                      {accessRequestCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {accessRequestCount > 9 ? '9+' : accessRequestCount}
+                        </span>
+                      )}
                     </button>
                     <button
                       onClick={() => setIsTeamsGroupsConfigOpen(true)}

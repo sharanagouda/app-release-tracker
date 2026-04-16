@@ -13,12 +13,14 @@
 import React, { useEffect, useState } from 'react';
 import { X, Shield, User, ChevronDown, RefreshCw, AlertCircle } from 'lucide-react';
 import { UserProfile, UserRole, subscribeToAllUsers, updateUserRole, subscribeToAccessRequests, resolveAccessRequest, AccessRequest } from '../services/firebaseUsers';
+import { createNotification } from '../services/firebaseNotifications';
 
 interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
   darkMode?: boolean;
   currentUserUid?: string;
+  accessRequestCount?: number;
 }
 
 const ROLE_LABELS: Record<UserRole, { label: string; description: string; color: string; darkColor: string }> = {
@@ -58,6 +60,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onClose,
   darkMode = false,
   currentUserUid,
+  accessRequestCount = 0,
 }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [requests, setRequests] = useState<AccessRequest[]>([]);
@@ -119,18 +122,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleResolveRequest = async (request: AccessRequest, approved: boolean) => {
     try {
       if (approved) {
-        // Update user role to editor (default approved role)
         await updateUserRole(request.uid, 'editor');
         await resolveAccessRequest(request.id, 'approved');
+        await createNotification(request.uid, 'access_approved', 'Your access request has been approved. You now have Editor access.');
         setSuccessMsg(`Approved access for ${request.displayName}`);
       } else {
         await resolveAccessRequest(request.id, 'rejected');
+        await createNotification(request.uid, 'access_rejected', 'Your access request has been rejected. Please contact admin for more information.');
         setSuccessMsg(`Rejected access for ${request.displayName}`);
       }
       setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to resolve request:', err);
-      setError('Failed to process request');
+      setError(err?.message || 'Failed to process request');
     }
   };
 
