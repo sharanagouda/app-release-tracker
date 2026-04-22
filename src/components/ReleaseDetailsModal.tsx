@@ -77,20 +77,35 @@ const generateEmailContent = (release: Release): { subject: string; body: string
   body += `PLATFORM DETAILS\n${'─'.repeat(50)}\n\n`;
   release.platforms.forEach((platform) => {
     const conceptReleases = getConceptReleases(platform);
-    body += `▸ ${platform.platform}\n`;
     conceptReleases.forEach((cr) => {
       const concepts = cr.concepts?.join(', ') || 'All Concepts';
-      body += `  Concepts: ${concepts}\n`;
-      body += `  Version: ${cr.version || 'N/A'}  |  Build: ${cr.buildId || 'N/A'}\n`;
-      body += `  Rollout: ${cr.rolloutPercentage}%  |  Status: ${cr.status}\n`;
-      if (cr.buildLink) body += `  Build Link: ${cr.buildLink}\n`;
-      if (cr.notes) body += `  Notes: ${cr.notes}\n`;
-      if (cr.versionChanges && cr.versionChanges.length > 0) {
-        body += `  What's New:\n`;
-        cr.versionChanges.forEach((vc) => {
-          body += `    • ${vc}\n`;
-        });
+      body += `${concepts} - ${release.environment || 'N/A'}`;
+      
+      // Add rollout status after environment
+      if (cr.rolloutPercentage === 100) {
+        body += ` rolled out ${cr.rolloutPercentage}% completed\n`;
+      } else if (cr.rolloutPercentage > 0) {
+        body += ` rolled out at ${cr.rolloutPercentage}%\n`;
+      } else {
+        body += ` rolled out at 0%\n`;
       }
+      
+      body += `${platform.platform} - ${cr.version || 'N/A'} (${cr.buildId || 'N/A'})`;
+      
+      // Add concept statuses inline
+      if (cr.conceptStatuses && Object.keys(cr.conceptStatuses).length > 0) {
+        const statusEntries = Object.entries(cr.conceptStatuses)
+          .filter(([_, v]) => v)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(', ');
+        if (statusEntries) {
+          body += ` (${statusEntries})`;
+        }
+      }
+      body += `\n`;
+      
+      if (cr.buildLink) body += `Build Link: ${cr.buildLink}\n`;
+      if (cr.notes) body += `Notes: ${cr.notes}\n`;
       body += `\n`;
     });
   });
@@ -198,28 +213,37 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
       const conceptReleases = getConceptReleases(platform);
       conceptReleases.forEach((cr) => {
         const concepts = cr.concepts?.join(', ') || 'All Concepts';
-        message += `${concepts} - ${env}\n`;
-        message += `${platform.platform} - ${cr.version || 'N/A'}${cr.buildId ? ` (${cr.buildId})` : ''}\n`;
+        message += `${concepts} - ${env}`;
+        
+        // Add rollout status after environment
+        if (cr.rolloutPercentage === 100) {
+          message += ` rolled out ${cr.rolloutPercentage}% completed\n`;
+        } else if (cr.rolloutPercentage > 0) {
+          message += ` rolled out at ${cr.rolloutPercentage}%\n`;
+        } else {
+          message += ` rolled out at 0%\n`;
+        }
+        
+        message += `${platform.platform} - ${cr.version || 'N/A'}${cr.buildId ? ` (${cr.buildId})` : ''}`;
+        
+        // Add concept statuses in parentheses
+        if (cr.conceptStatuses && Object.keys(cr.conceptStatuses).length > 0) {
+          const statusEntries = Object.entries(cr.conceptStatuses)
+            .filter(([_, v]) => v)
+            .map(([k, v]) => `${k} ${v}`)
+            .join(', ');
+          if (statusEntries) {
+            message += ` (${statusEntries})`;
+          }
+        }
+        
+        message += `\n`;
         if (cr.buildLink) {
           message += `Build Link: ${cr.buildLink}\n`;
         }
         message += `\n`;
       });
     });
-
-    // Rollout info
-    const rolloutLines: string[] = [];
-    release.platforms.forEach((platform) => {
-      const conceptReleases = getConceptReleases(platform);
-      conceptReleases.forEach((cr) => {
-        if (cr.rolloutPercentage > 0) {
-          rolloutLines.push(`${cr.rolloutPercentage}%(${platform.platform})`);
-        }
-      });
-    });
-    if (rolloutLines.length > 0) {
-      message += `Rollout will start at ${rolloutLines.join(' and ')} after successful review.\n\n`;
-    }
 
     // Changes
     if (release.changes && release.changes.length > 0) {
@@ -711,6 +735,42 @@ export const ReleaseDetailsModal: React.FC<ReleaseDetailsModalProps> = ({
                                   />
                                 </div>
                               </div>
+                              
+                              {/* Concept Statuses */}
+                              {conceptRelease.conceptStatuses && Object.keys(conceptRelease.conceptStatuses).length > 0 && (
+                                <div className="mt-3">
+                                  <div className="flex items-center gap-1.5 mb-2">
+                                    <span className={`text-xs sm:text-sm font-medium ${
+                                      darkMode ? 'text-gray-300' : 'text-gray-700'
+                                    }`}>
+                                      Concept Statuses
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {Object.entries(conceptRelease.conceptStatuses).map(([concept, status]) => {
+                                      if (!status) return null;
+                                      const getStatusBadgeColor = (s: string) => {
+                                        const statusLower = s.toLowerCase();
+                                        if (statusLower === 'approved' || statusLower === 'rolled out') {
+                                          return darkMode ? 'bg-green-900/50 text-green-300 border-green-700' : 'bg-green-100 text-green-800 border-green-200';
+                                        }
+                                        if (statusLower === 'in review' || statusLower === 'pending') {
+                                          return darkMode ? 'bg-yellow-900/50 text-yellow-300 border-yellow-700' : 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                                        }
+                                        if (statusLower === 'rejected') {
+                                          return darkMode ? 'bg-red-900/50 text-red-300 border-red-700' : 'bg-red-100 text-red-800 border-red-200';
+                                        }
+                                        return darkMode ? 'bg-gray-700 text-gray-300 border-gray-600' : 'bg-gray-100 text-gray-800 border-gray-200';
+                                      };
+                                      return (
+                                        <span key={concept} className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusBadgeColor(status)}`}>
+                                          {concept}: {status}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                               
                               {conceptRelease.notes && (
                                 <div className={`mt-2 sm:mt-3 p-2 rounded text-xs sm:text-sm ${

@@ -42,6 +42,7 @@ export interface ConceptRelease {
   buildLink?: string;
   rolloutHistory?: RolloutHistoryEntry[];
   versionChanges?: string[]; // Version-specific changes/what's new in this version
+  conceptStatuses?: Record<string, string>; // Per-concept status, e.g., { "BS": "approved", "MC": "in review" }
 }
 
 export interface PlatformRelease {

@@ -902,24 +902,84 @@ useEffect(() => {
                             </p>
                           </div>
 
-                          <div className="mt-3">
-                            <label className={`block text-sm font-medium mb-1 ${
-                              darkMode ? 'text-gray-300' : 'text-gray-700'
-                            }`}>
-                              Build Link (Optional)
-                            </label>
-                            <input
-                              type="url"
-                              value={conceptRelease.buildLink || ''}
-                              onChange={(e) => updateConceptRelease(platformIndex, conceptIndex, 'buildLink', e.target.value)}
-                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                darkMode 
-                                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                              }`}
-                              placeholder="https://sharepoint.com/builds/..."
-                            />
-                          </div>
+<div className="mt-3">
+                             <label className={`block text-sm font-medium mb-1 ${
+                               darkMode ? 'text-gray-300' : 'text-gray-700'
+                             }`}>
+                               Build Link (Optional)
+                             </label>
+                             <input
+                               type="url"
+                               value={conceptRelease.buildLink || ''}
+                               onChange={(e) => updateConceptRelease(platformIndex, conceptIndex, 'buildLink', e.target.value)}
+                               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                 darkMode 
+                                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                                   : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                               }`}
+                               placeholder="https://sharepoint.com/builds/..."
+                             />
+                           </div>
+
+                           {/* Per-Concept Statuses */}
+                           {(conceptRelease.concepts && conceptRelease.concepts.length > 0 && !conceptRelease.concepts.includes('All Concepts')) && (
+                             <div className="mt-4">
+                               <label className={`block text-sm font-medium mb-2 ${
+                                 darkMode ? 'text-gray-300' : 'text-gray-700'
+                               }`}>
+                                 Concept Statuses
+                                 <span className={`ml-1 text-xs font-normal ${
+                                   darkMode ? 'text-gray-400' : 'text-gray-500'
+                                 }`}>
+                                   (per-concept approval status)
+                                 </span>
+                               </label>
+<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 pr-1">
+                                  {conceptRelease.concepts.map(concept => {
+                                    const currentStatus = (conceptRelease.conceptStatuses || {})[concept] || '';
+                                    return (
+                                      <div key={concept} className="flex flex-col">
+                                        <span className={`text-xs font-medium mb-1 ${
+                                          darkMode ? 'text-gray-400' : 'text-gray-600'
+                                        }`}>
+                                          {concept}
+                                        </span>
+                                        <select
+                                          value={currentStatus}
+                                          onChange={(e) => {
+                                            const newStatuses = { ...(conceptRelease.conceptStatuses || {}) };
+                                            if (e.target.value) {
+                                              newStatuses[concept] = e.target.value;
+                                            } else {
+                                              delete newStatuses[concept];
+                                            }
+                                            updateConceptRelease(platformIndex, conceptIndex, 'conceptStatuses', newStatuses);
+                                          }}
+                                          className={`w-full px-2 py-1.5 border rounded-lg text-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-700'}`}
+                                       >
+                                         <option value="">Select status</option>
+                                         <option value="approved">Approved</option>
+                                         <option value="in review">In Review</option>
+                                         <option value="pending">Pending</option>
+                                         <option value="rejected">Rejected</option>
+                                         <option value="rolled out">Rolled Out</option>
+                                       </select>
+                                     </div>
+                                   );
+                                 })}
+                               </div>
+                               {Object.keys(conceptRelease.conceptStatuses || {}).length > 0 && (
+                                 <p className={`text-xs mt-2 ${
+                                   darkMode ? 'text-gray-400' : 'text-gray-500'
+                                 }`}>
+                                   Active statuses: {Object.entries(conceptRelease.conceptStatuses || {})
+                                     .filter(([_, v]) => v)
+                                     .map(([k, v]) => `${k}: ${v}`)
+                                     .join(', ')}
+                                 </p>
+                               )}
+                             </div>
+                           )}
 
                           {/* Version-specific Changes — only shown when multiple release versions exist */}
                           {platform.conceptReleases && platform.conceptReleases.length > 1 && (
