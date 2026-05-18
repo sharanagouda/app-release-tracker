@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2, FileSpreadsheet } from 'lucide-react';
 import { Release, PlatformRelease, ConceptRelease } from '../types/release';
 import { ENVIRONMENTS, CONCEPTS, PLATFORMS } from '../data/mockData';
 import { TagInput } from './TagInput';
+import { SpreadsheetImportModal } from './SpreadsheetImportModal';
 
 interface ReleaseModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export const ReleaseModal: React.FC<ReleaseModalProps> = ({
   const [loadError, setLoadError] = useState('');
   // Map of "platformIndex-conceptIndex" → error message for rollout % decrease attempts
   const [rolloutErrors, setRolloutErrors] = useState<Record<string, string>>({});
+  const [isSpreadsheetImportOpen, setIsSpreadsheetImportOpen] = useState(false);
   const [formData, setFormData] = useState({
     releaseDate: '',
     releaseName: '',
@@ -469,6 +471,20 @@ useEffect(() => {
             </h2>
 
             <div className="flex items-center gap-3">
+              {!editingRelease && (
+                <button
+                  type="button"
+                  onClick={() => setIsSpreadsheetImportOpen(true)}
+                  className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    darkMode
+                      ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50 border border-green-700'
+                      : 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span className="hidden sm:inline">Import Spreadsheet</span>
+                </button>
+              )}
               {!editingRelease && releases.length > 0 && (
                 <div className="relative">
                   <select
@@ -1130,6 +1146,41 @@ useEffect(() => {
           </form>
         </div>
       </div>
+
+      {/* Spreadsheet Import Modal */}
+      <SpreadsheetImportModal
+        isOpen={isSpreadsheetImportOpen}
+        onClose={() => setIsSpreadsheetImportOpen(false)}
+        darkMode={darkMode}
+        onImport={(data) => {
+          // Merge imported data into the form
+          setFormData(prev => {
+            const newChanges = data.changes.length > 0
+              ? data.changes
+              : prev.changes;
+
+            // Try to set release name from concepts + version
+            let releaseName = prev.releaseName;
+            if (!releaseName && (data.concepts || data.version)) {
+              const parts = [data.concepts, data.version].filter(Boolean);
+              releaseName = parts.join(' - ');
+            }
+
+            // Try to set notes from CR link
+            let notes = prev.notes;
+            if (!notes && data.crLink) {
+              notes = `CR: ${data.crLink}`;
+            }
+
+            return {
+              ...prev,
+              releaseName: releaseName || prev.releaseName,
+              notes: notes || prev.notes,
+              changes: newChanges,
+            };
+          });
+        }}
+      />
     </div>
   );
 };
