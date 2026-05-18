@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, AlertCircle, Settings, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { X, AlertCircle, Settings, RotateCcw, CheckCircle2, Link2 } from 'lucide-react';
 import { DeploymentHistoryItem } from '../../services/api/interfaces';
 import { codePushService } from '../../services/api/CodePushService';
 import { RollbackModal } from './RollbackModal';
+import { syncCodePushRolloutToReleases } from '../../services/codepushReleaseSync';
+import { Release } from '../../types/release';
 
 interface EditRolloutModalProps {
   isOpen: boolean;
@@ -12,6 +14,8 @@ interface EditRolloutModalProps {
   environment: string;
   darkMode: boolean;
   onSuccess: () => void;
+  /** Current releases list for auto-sync (optional — if not provided, sync is skipped) */
+  releases?: Release[];
 }
 
 const ROLLOUT_PRESETS = [10, 25, 50, 75, 100];
@@ -24,6 +28,7 @@ export const EditRolloutModal: React.FC<EditRolloutModalProps> = ({
   environment,
   darkMode,
   onSuccess,
+  releases = [],
 }) => {
   // Form state
   const [rollout, setRollout] = useState(100);
@@ -83,7 +88,27 @@ export const EditRolloutModal: React.FC<EditRolloutModalProps> = ({
 
       await codePushService.updateRelease(appName, environment, options);
 
-      setSuccess('Deployment updated successfully!');
+      // Auto-sync: if rollout changed, update matching Firestore releases
+      if (rollout !== currentRollout && releases.length > 0) {
+        try {
+          const updatedIds = await syncCodePushRolloutToReleases(
+            releases,
+            deployment.appVersion,
+            rollout
+          );
+          if (updatedIds.length > 0) {
+            setSuccess(`Deployment updated! Also synced rollout to ${updatedIds.length} release(s).`);
+          } else {
+            setSuccess('Deployment updated successfully!');
+          }
+        } catch (syncErr) {
+          console.error('[CodePush] Release sync failed (non-blocking):', syncErr);
+          setSuccess('Deployment updated! (Release sync failed — check console)');
+        }
+      } else {
+        setSuccess('Deployment updated successfully!');
+      }
+
       setTimeout(() => {
         onSuccess();
         onClose();

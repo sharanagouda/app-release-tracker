@@ -1,6 +1,9 @@
 import React from 'react';
-import { TrendingUp, Download, CheckCircle, XCircle, Edit3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { TrendingUp, Download, CheckCircle, XCircle, Edit3, ExternalLink } from 'lucide-react';
 import { DeploymentHistoryItem, DeploymentMetrics } from '../../services/api/interfaces';
+import { Release } from '../../types/release';
+import { findMatchingReleases } from '../../services/codepushReleaseSync';
 
 interface DeploymentHistoryProps {
   history: DeploymentHistoryItem[];
@@ -8,6 +11,8 @@ interface DeploymentHistoryProps {
   onEdit?: (deployment: DeploymentHistoryItem) => void;
   canEdit: boolean;
   darkMode: boolean;
+  /** Current releases list — used to show "View Release" links */
+  releases?: Release[];
 }
 
 function formatBytes(bytes: number): string {
@@ -35,6 +40,7 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
   onEdit,
   canEdit,
   darkMode,
+  releases = [],
 }) => {
   if (history.length === 0) {
     return (
@@ -92,19 +98,39 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
                   </span>
                 )}
               </div>
-              {canEdit && (
-                <button
-                  onClick={() => onEdit?.(dep)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    darkMode
-                      ? 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50'
-                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                  }`}
-                >
-                  <Edit3 className="w-3 h-3" />
-                  Edit
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {/* View Release link */}
+                {(() => {
+                  const matching = findMatchingReleases(releases, dep.appVersion);
+                  if (matching.length === 0) return null;
+                  return (
+                    <Link
+                      to={`/releases/${matching[0].id}`}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        darkMode
+                          ? 'text-green-400 hover:bg-green-900/30'
+                          : 'text-green-600 hover:bg-green-50'
+                      }`}
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      View Release
+                    </Link>
+                  );
+                })()}
+                {canEdit && (
+                  <button
+                    onClick={() => onEdit?.(dep)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      darkMode
+                        ? 'bg-blue-900/30 text-blue-400 hover:bg-blue-900/50'
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                    }`}
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    Edit
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Description */}
