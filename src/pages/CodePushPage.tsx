@@ -155,7 +155,7 @@ export const CodePushPage: React.FC = () => {
   };
 
   const appName = selectedConcept
-    ? getAppName(territoryConfig.prefix, selectedConcept.appNameKey, platform)
+    ? getAppName(territoryConfig.prefix, selectedConcept.appNameKey, platform, selectedConcept.appNameKeyByPlatform)
     : '';
 
   const {

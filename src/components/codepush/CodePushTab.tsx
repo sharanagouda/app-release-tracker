@@ -102,7 +102,7 @@ export const CodePushTab: React.FC<CodePushTabProps> = ({
   }, [territory, platform, availableEnvironments, environment]);
 
   const appName = selectedConcept
-    ? getAppName(territoryConfig.prefix, selectedConcept.appNameKey, platform)
+    ? getAppName(territoryConfig.prefix, selectedConcept.appNameKey, platform, selectedConcept.appNameKeyByPlatform)
     : '';
 
   const {

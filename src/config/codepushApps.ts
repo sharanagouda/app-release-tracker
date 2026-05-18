@@ -8,7 +8,9 @@ export type CodePushEnvironment = 'Production' | 'ProductionStaging' | 'Staging'
 
 export interface ConceptConfig {
   name: string;           // Display name
-  appNameKey: string;     // Key used in the CodePush app name (e.g., "Babyshop", "MaxAE")
+  appNameKey: string;     // Default key used in the CodePush app name (e.g., "Babyshop", "MaxAE")
+  /** Per-platform overrides when the CodePush server uses a different name per platform */
+  appNameKeyByPlatform?: Partial<Record<CodePushPlatform, string>>;
 }
 
 export interface TerritoryConfig {
@@ -37,10 +39,11 @@ const BLC_CONCEPTS: ConceptConfig[] = [
 ];
 
 // ─── Hybris Territory ─────────────────────────────────────────────────────────
-// Note: Some names differ from BLC (e.g., "MaxAE", "HomecentreAE", "Centrpoint" typo)
+// Note: Some names differ from BLC (e.g., "MaxAE", "HomecentreAE")
+// Centrepoint has a typo on the server: iOS = "Centrepoint", Android = "Centrpoint"
 const HYBRIS_CONCEPTS: ConceptConfig[] = [
   { name: 'Babyshop',     appNameKey: 'Babyshop' },
-  { name: 'Centrepoint',  appNameKey: 'Centrpoint' },    // API has typo: "Centrpoint"
+  { name: 'Centrepoint',  appNameKey: 'Centrepoint', appNameKeyByPlatform: { Android: 'Centrpoint' } },
   { name: 'Homebox',      appNameKey: 'Homebox' },
   { name: 'Homecentre',   appNameKey: 'HomecentreAE' },
   { name: 'Max',          appNameKey: 'MaxAE' },
@@ -77,10 +80,18 @@ export const PLATFORMS: CodePushPlatform[] = ['iOS', 'Android'];
 
 /**
  * Build the CodePush app name.
+ * Uses per-platform override if available, otherwise falls back to default key.
  * e.g., getAppName('BL', 'Babyshop', 'iOS') → "BL_Babyshop_iOS"
+ *        getAppName('RN', 'Centrepoint', 'Android', { Android: 'Centrpoint' }) → "RN_Centrpoint_Android"
  */
-export function getAppName(prefix: string, conceptKey: string, platform: CodePushPlatform): string {
-  return `${prefix}_${conceptKey}_${platform}`;
+export function getAppName(
+  prefix: string,
+  conceptKey: string,
+  platform: CodePushPlatform,
+  keyOverrides?: Partial<Record<CodePushPlatform, string>>,
+): string {
+  const key = keyOverrides?.[platform] || conceptKey;
+  return `${prefix}_${key}_${platform}`;
 }
 
 /**
