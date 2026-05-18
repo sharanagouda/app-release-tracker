@@ -1,0 +1,92 @@
+{
+  "headers": {
+    "date": "Mon, 02 Feb 2026 18:17:11 GMT",
+    "content-type": "application/json; charset=utf-8",
+    "transfer-encoding": "chunked",
+    "connection": "close",
+    "content-encoding": "gzip",
+    "access-control-allow-credentials": "true",
+    "access-control-allow-headers": "Content-Type, X-CodePush-Plugin-Name, X-CodePush-Plugin-Version, X-CodePush-SDK-Version",
+    "access-control-allow-methods": "GET, POST, DELETE, PUT",
+    "access-control-allow-origin": "https://codepush.landmarkgroup.com",
+    "access-control-expose-headers": "Location",
+    "cache-control": "no-cache",
+    "set-cookie": [
+      "ARRAffinity=0f3e80b62b3d5260aaafc1777997f892b18b9e05566686e4f34e14f86360d9ec;Path=/;HttpOnly;Domain=codepush.landmarkgroup.com",
+      "ARRAffinity=8528420ccde62e3f7e0853edb739a8d6354b7e2ef9fb495e896bc5189e88015e;Path=/;HttpOnly;Secure;Domain=codepush.landmarkgroup.com",
+      "ARRAffinitySameSite=8528420ccde62e3f7e0853edb739a8d6354b7e2ef9fb495e896bc5189e88015e;Path=/;HttpOnly;SameSite=None;Secure;Domain=codepush.landmarkgroup.com",
+      "__cf_bm=NOuErv0UqMCMRKS78g192IphZT9TBNGyU73a_QGfGcs-1770056231-1.0.1.1-dvxvzoBqKY0cAwBjRkiYxU9lrPb1NbCS1cWQcxknqk5g17Om8GMxZaCj7SSirZRpwCKjWQQa9eZA4Jq6BeLP05LEK_yQJFJLMIgQdoWAecE; path=/; expires=Mon, 02-Feb-26 18:47:11 GMT; domain=.landmarkgroup.com; HttpOnly; Secure"
+    ],
+    "x-powered-by": "Express",
+    "cf-cache-status": "DYNAMIC",
+    "server": "cloudflare",
+    "cf-ray": "9c7baf0fcec03c0d-BLR"
+  },
+  "body": {
+    "metrics": {
+      "v38": {
+        "active": 148161,
+        "downloaded": 16793,
+        "failed": 725,
+        "installed": 157886
+      },
+      "v19": {
+        "active": 657,
+        "downloaded": 687,
+        "failed": 66,
+        "installed": 687
+      },
+      "v32": {
+        "active": 1552,
+        "downloaded": 190,
+        "failed": 8,
+        "installed": 1600
+      },
+      "v6": {
+        "active": 129,
+        "downloaded": 150,
+        "failed": 12,
+        "installed": 136
+      },
+      "v15": {
+        "active": 303,
+        "downloaded": 51,
+        "failed": 5,
+        "installed": 311
+      },
+      "v39": {
+        "active": 81670,
+        "downloaded": 97462,
+        "failed": 1467,
+        "installed": 81964
+      },
+      "v13": {
+        "active": 388,
+        "downloaded": 441,
+        "failed": 55,
+        "installed": 402
+      },
+      "v3": {
+        "active": 6,
+        "downloaded": 0,
+        "failed": 1,
+        "installed": 7
+      },
+      "v11": {
+        "active": 18,
+        "downloaded": 0,
+        "failed": 2,
+        "installed": 26
+      },
+      "v23": {
+        "active": 6,
+        "downloaded": 0,
+        "failed": 5,
+        "installed": 29
+      },
+      "11.8.9": {
+        "active": 0
+      }
+    }
+  }
+}

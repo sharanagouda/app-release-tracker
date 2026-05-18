@@ -27,6 +27,8 @@ import { CompareReleasesModal } from './components/CompareReleasesModal';
 import { TeamsGroupsConfigModal } from './components/TeamsGroupsConfigModal';
 import { initializeDefaultTeamsGroups, addTeamsGroup, updateTeamsGroup, deleteTeamsGroup, getTeamsGroups, TeamsGroup } from './services/firebaseConfig';
 import { subscribeToNotifications, markNotificationAsRead, Notification } from './services/firebaseNotifications';
+import { TabNavigation, MainTab } from './components/common/TabNavigation';
+import { CodePushTab } from './components/codepush/CodePushTab';
 
 function App() {
   const { releases, loading, saving, saveError, addRelease, updateRelease, deleteRelease } = useReleases();
@@ -57,6 +59,7 @@ function App() {
   const [accessRequestCount, setAccessRequestCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<MainTab>('releases');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = userRole === 'admin';
@@ -445,36 +448,21 @@ function App() {
   return (
     <div className={`min-h-screen ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Header: Title left, Tabs + Dark Mode right */}
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-gray-100' : 'text-gray-900'
-              }`}>
+            <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
               Release Tracker
             </h1>
             <p className={darkMode ? 'text-gray-400' : 'text-gray-600'}>
               Track and manage your application releases across all platforms
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {user && (
-              <p className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Hi {getDisplayName(user)}
-              </p>
-            )}
-            <button
-              onClick={() => setIsShortcutsHelpOpen(true)}
-              className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
-                  ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
-                  : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                }`}
-              title="Keyboard shortcuts (?)"
-            >
-              <Keyboard className="w-4 h-4" />
-            </button>
+          <div className="flex items-center gap-3">
+            <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} darkMode={darkMode} />
             <button
               onClick={toggleDarkMode}
-              className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${darkMode
+              className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
                   ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                   : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
                 }`}
@@ -482,92 +470,122 @@ function App() {
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            {user && (
+          </div>
+        </div>
+
+        {/* CodePush Tab */}
+        {activeTab === 'codepush' && (
+          <CodePushTab
+            darkMode={darkMode}
+            canEdit={canEdit}
+          />
+        )}
+
+        {/* Release Tracker Tab */}
+        {activeTab === 'releases' && (
+          <>
+        {/* Release toolbar */}
+        <div className="mb-6 flex items-center justify-end gap-2">
+          {user && (
+            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Hi {getDisplayName(user)}
+            </p>
+          )}
+          <button
+            onClick={() => setIsShortcutsHelpOpen(true)}
+            className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
+                ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+              }`}
+            title="Keyboard shortcuts (?)"
+          >
+            <Keyboard className="w-4 h-4" />
+          </button>
+          {user && (
+            <button
+              onClick={async () => {
+                if (notifications.length > 0) {
+                  const messages = notifications.map(n => n.message).join('\n• ');
+                  setToastMessage(`• ${messages}`);
+                  await Promise.all(notifications.map(n => markNotificationAsRead(n.id)));
+                  setNotifications([]);
+                } else {
+                  setToastMessage('No new notifications');
+                }
+              }}
+              className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
+                  ? 'text-yellow-300 bg-yellow-900/30 hover:bg-yellow-900/50'
+                  : 'text-yellow-700 bg-yellow-100 hover:bg-yellow-200'
+                }`}
+              title={notifications.length > 0 ? `${notifications.length} notification(s)` : 'No notifications'}
+            >
+              <Bell className="w-4 h-4" />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {notifications.length > 9 ? '9+' : notifications.length}
+                </span>
+              )}
+            </button>
+          )}
+          {user ? (
+            <>
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => setIsAdminPanelOpen(true)}
+                    className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
+                        ? 'text-purple-300 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700'
+                        : 'text-purple-700 bg-purple-100 hover:bg-purple-200 border border-purple-200'
+                      }`}
+                    title="Admin Panel"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Admin
+                    {accessRequestCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                        {accessRequestCount > 9 ? '9+' : accessRequestCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setIsTeamsGroupsConfigOpen(true)}
+                    className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
+                        ? 'text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-700'
+                        : 'text-blue-700 bg-blue-100 hover:bg-blue-200 border border-blue-200'
+                      }`}
+                    title="Configure Teams Groups"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </button>
+                </>
+              )}
               <button
-                onClick={async () => {
-                  if (notifications.length > 0) {
-                    const messages = notifications.map(n => n.message).join('\n• ');
-                    setToastMessage(`• ${messages}`);
-                    await Promise.all(notifications.map(n => markNotificationAsRead(n.id)));
-                    setNotifications([]);
-                  } else {
-                    setToastMessage('No new notifications');
-                  }
-                }}
-                className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
-                    ? 'text-yellow-300 bg-yellow-900/30 hover:bg-yellow-900/50'
-                    : 'text-yellow-700 bg-yellow-100 hover:bg-yellow-200'
-                  }`}
-                title={notifications.length > 0 ? `${notifications.length} notification(s)` : 'No notifications'}
-              >
-                <Bell className="w-4 h-4" />
-                {notifications.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {notifications.length > 9 ? '9+' : notifications.length}
-                  </span>
-                )}
-              </button>
-            )}
-            {user ? (
-              <>
-                {isAdmin && (
-                  <>
-                    <button
-                      onClick={() => setIsAdminPanelOpen(true)}
-                      className={`relative flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
-                          ? 'text-purple-300 bg-purple-900/30 hover:bg-purple-900/50 border border-purple-700'
-                          : 'text-purple-700 bg-purple-100 hover:bg-purple-200 border border-purple-200'
-                        }`}
-                      title="Admin Panel"
-                    >
-                      <Shield className="w-4 h-4 mr-2" />
-                      Admin
-                      {accessRequestCount > 0 && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                          {accessRequestCount > 9 ? '9+' : accessRequestCount}
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setIsTeamsGroupsConfigOpen(true)}
-                      className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${darkMode
-                          ? 'text-blue-300 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-700'
-                          : 'text-blue-700 bg-blue-100 hover:bg-blue-200 border border-blue-200'
-                        }`}
-                      title="Configure Teams Groups"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Settings
-                    </button>
-                  </>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${darkMode
-                      ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
-                      : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                    }`}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => {
-                  setAuthAction('sign in');
-                  setIsAuthModalOpen(true);
-                }}
+                onClick={handleLogout}
                 className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${darkMode
                     ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
                     : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
                   }`}
               >
-                <LogIn className="w-4 h-4 mr-2" />
-                Sign In
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
               </button>
-            )}
-          </div>
+            </>
+          ) : (
+            <button
+              onClick={() => {
+                setAuthAction('sign in');
+                setIsAuthModalOpen(true);
+              }}
+              className={`flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${darkMode
+                  ? 'text-gray-300 bg-gray-800 hover:bg-gray-700'
+                  : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                }`}
+            >
+              <LogIn className="w-4 h-4 mr-2" />
+              Sign In
+            </button>
+          )}
         </div>
 
         {/* Current Release Status */}
@@ -882,6 +900,8 @@ function App() {
               Try adjusting your search or filters, or add a new release.
             </p>
           </div>
+        )}
+          </>
         )}
       </div>
 

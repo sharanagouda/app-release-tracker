@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@source "../components/**/*.tsx";
+@source "../app/**/*.tsx";
+@source "../lib/**/*.ts";
+
+@theme {
+  --color-background: #fafafa;
+  --color-foreground: #171717;
+  --font-sans: var(--font-inter);
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ensure proper text rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
